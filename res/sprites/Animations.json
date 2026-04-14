@@ -1,0 +1,72 @@
+{
+  "animations" : [
+    { "name" : "DragonGreen-Idle", "FramesPerSprite" : 4 },
+    { "name" : "DragonGreen-Walking", "FramesPerSprite" : 10 },
+    { "name" : "DragonGreen-Shooting", "FramesPerSprite" : 4 },
+    { "name" : "DragonGreen-Jumping", "FramesPerSprite" : 10 },
+    { "name" : "DragonGreen-Falling", "FramesPerSprite" : 10 },
+    { "name" : "DragonGreen-Hit", "FramesPerSprite" : 4 },
+    { "name" : "DragonGreen-HitStare", "FramesPerSprite" : 4 },
+    { "name" : "DragonGreen-Respawn", "FramesPerSprite" : 16 },
+
+    { "name" : "DragonBlue-Idle", "FramesPerSprite" : 4 },
+    { "name" : "DragonBlue-Walking", "FramesPerSprite" : 10 },
+    { "name" : "DragonBlue-Shooting", "FramesPerSprite" : 4 },
+    { "name" : "DragonBlue-Jumping", "FramesPerSprite" : 10 },
+    { "name" : "DragonBlue-Falling", "FramesPerSprite" : 10 },
+    { "name" : "DragonBlue-Hit", "FramesPerSprite" : 4 },
+    { "name" : "DragonBlue-HitStare", "FramesPerSprite" : 4 },
+    { "name" : "DragonBlue-Respawn", "FramesPerSprite" : 16 },
+
+    { "name" : "Can-Walk", "FramesPerSprite" : 7 },
+    { "name" : "Can-Bubbled", "FramesPerSprite" : 18 },
+    { "name" : "Can-Item", "FramesPerSprite" : 5 },
+    
+    { "name" : "Ghost-Walk", "FramesPerSprite" : 7 },
+    { "name" : "Ghost-Shoot", "FramesPerSprite" : 7 },
+    { "name" : "Ghost-Bubbled", "FramesPerSprite" : 18 },
+    { "name" : "Ghost-Item", "FramesPerSprite" : 5 },
+
+    { "name" : "Potato-Walk", "FramesPerSprite" : 7 },
+    { "name" : "Potato-Shoot", "FramesPerSprite" : 7 },
+    { "name" : "Potato-Bubbled", "FramesPerSprite" : 18 },
+    { "name" : "Potato-Item", "FramesPerSprite" : 5 },
+
+    { "name" : "Witch-Walk", "FramesPerSprite" : 7 },
+    { "name" : "Witch-Shoot", "FramesPerSprite" : 8 },
+    { "name" : "Witch-Bubbled", "FramesPerSprite" : 18 },
+    { "name" : "Witch-Item", "FramesPerSprite" : 5 },
+
+    { "name" : "Snowman-Walk", "FramesPerSprite" : 7 },
+    { "name" : "Snowman-Shoot", "FramesPerSprite" : 8 },
+    { "name" : "Snowman-Bubbled", "FramesPerSprite" : 18 },
+    { "name" : "Snowman-Item", "FramesPerSprite" : 5 },
+
+    { "name" : "Mushroom-Jump", "FramesPerSprite" : 7 },
+    { "name" : "Mushroom-Bubbled", "FramesPerSprite" : 18 },
+    { "name" : "Mushroom-Item", "FramesPerSprite" : 5 },
+    
+    { "name" : "Purple-Fly", "FramesPerSprite" : 7 },
+    { "name" : "Purple-Bubbled", "FramesPerSprite" : 18 },
+    { "name" : "Purple-Item", "FramesPerSprite" : 5 },
+
+    { "name" : "Pig-Fly", "FramesPerSprite" : 7 },
+    { "name" : "Pig-Bubbled", "FramesPerSprite" : 18 },
+    { "name" : "Pig-Item", "FramesPerSprite" : 5 },
+
+    { "name" : "Boss-Walk", "FramesPerSprite" : 5 },
+    { "name" : "Boss-Bubbled", "FramesPerSprite" : 5 },
+    { "name" : "Boss-Item", "FramesPerSprite" : 5 },
+
+    { "name" : "Projectile-Ghost", "FramesPerSprite" : 5 },
+    { "name" : "Projectile-Ghost-Destroy", "FramesPerSprite" : 5 },
+    { "name" : "Projectile-Potato", "FramesPerSprite" : 5 },
+    { "name" : "Projectile-Witch", "FramesPerSprite" : 5 },
+    { "name" : "Projectile-Snowman", "FramesPerSprite" : 5 },
+    
+    { "name" : "Bubble-Green-Idle", "FramesPerSprite" : 18 },
+    { "name" : "Bubble-Green-Shoot", "FramesPerSprite" : 6 },
+    { "name" : "Bubble-PrePop", "FramesPerSprite" : 4 },
+    { "name" : "Bubble-Pop", "FramesPerSprite" : 6 }
+  ]
+}
