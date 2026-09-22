@@ -1,23 +1,24 @@
-package main
+package app
 
 import (
+	"bubblebobble/internal/ym"
 	"bytes"
 	"fmt"
 	"io"
 
 	"bubblebobble/resources"
 	"github.com/hajimehoshi/ebiten/v2/audio"
-	"github.com/hajimehoshi/ebiten/v2/audio/vorbis"
 	"github.com/hajimehoshi/ebiten/v2/audio/wav"
 )
 
-const sampleRate = 44100
+const sampleRate = ym.SampleRate
 
 type soundSystem struct {
 	context                  *audio.Context
 	sounds                   map[string][]byte
 	players                  []*audio.Player
 	music                    *audio.Player
+	stream                   *ym.Stream
 	track                    string
 	musicVolume, soundVolume float64
 	muted                    bool
@@ -25,10 +26,7 @@ type soundSystem struct {
 
 func newSoundSystem(muted bool) (*soundSystem, error) {
 	a := &soundSystem{sounds: map[string][]byte{}, muted: muted}
-	// A muted launch also works on machines without an audio device.
-	if !muted {
-		a.context = audio.NewContext(sampleRate)
-	}
+	// The audio device is opened from Update, after Android creates its view.
 	for _, name := range []string{"shoot", "jump", "pop", "death", "food", "item", "fire", "water", "explosion", "laser"} {
 		b, err := resources.Files.ReadFile("audio/" + name + ".wav")
 		if err != nil {
@@ -69,6 +67,9 @@ func (a *soundSystem) play(name string) {
 }
 
 func (a *soundSystem) update(track string, paused bool) error {
+	if !a.muted && a.context == nil {
+		a.context = audio.NewContext(sampleRate)
+	}
 	kept := a.players[:0]
 	for _, p := range a.players {
 		if p.IsPlaying() {
@@ -89,18 +90,24 @@ func (a *soundSystem) update(track string, paused bool) error {
 			a.music.PauseAndStopReading()
 			a.music = nil
 		}
-		b, err := resources.Files.ReadFile("audio/" + track + ".ogg")
+		if a.stream != nil {
+			a.stream.Close()
+			a.stream = nil
+		}
+		b, err := resources.Files.ReadFile("audio/" + musicTracks[track] + ".ym")
 		if err != nil {
 			return err
 		}
-		stream, err := vorbis.DecodeWithSampleRate(sampleRate, bytes.NewReader(b))
+		stream, err := ym.New(b, true)
 		if err != nil {
 			return err
 		}
-		a.music, err = a.context.NewPlayer(audio.NewInfiniteLoop(stream, stream.Length()))
+		a.music, err = a.context.NewPlayer(stream)
 		if err != nil {
+			stream.Close()
 			return err
 		}
+		a.stream = stream
 		a.music.SetVolume(a.musicVolume)
 		a.track = track
 	}
@@ -114,9 +121,6 @@ func (a *soundSystem) update(track string, paused bool) error {
 
 func (a *soundSystem) toggleMute() {
 	a.muted = !a.muted
-	if !a.muted && a.context == nil {
-		a.context = audio.NewContext(sampleRate)
-	}
 	if a.muted {
 		for _, p := range a.players {
 			p.PauseAndStopReading()
@@ -132,4 +136,13 @@ func (a *soundSystem) close() {
 	for _, p := range a.players {
 		p.PauseAndStopReading()
 	}
+	if a.stream != nil {
+		a.stream.Close()
+		a.stream = nil
+	}
+}
+
+var musicTracks = map[string]string{
+	"theme": "bubble-1", "menu": "bubble-2", "opening": "bubble-2",
+	"hurry": "bubble-3", "gameover": "bubble-4", "win": "bubble-5",
 }

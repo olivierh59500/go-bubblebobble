@@ -62,7 +62,7 @@ func TestCampaignDataAndSpawns(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if g.blocked(g.Player.X, g.Player.Y, ActorSize) {
+		if g.blocked(g.Players[0].X, g.Players[0].Y, ActorSize) {
 			t.Errorf("round %d player embedded in a wall", i+1)
 		}
 		for _, e := range g.Enemies {
@@ -125,19 +125,19 @@ func TestPlatformsJumpLandingWallsAndWrap(t *testing.T) {
 
 func TestBubbleCapturePopAndCombo(t *testing.T) {
 	g := testGame(t)
-	g.Player.X, g.Player.Y = 100, 400
+	g.Players[0].X, g.Players[0].Y = 100, 400
 	g.Enemies[0].X, g.Enemies[0].Y = 170, 400
-	g.shootBubble()
+	g.shootBubble(0)
 	for i := 0; i < 10; i++ {
-		g.updateBubbles(Input{})
+		g.updateBubbles([]Input{{}})
 	}
 	if g.Enemies[0].State != Trapped {
 		t.Fatal("shot failed to trap enemy")
 	}
 	b := &g.Bubbles[0]
 	b.Age = 30
-	g.Player.X, g.Player.Y = b.X, b.Y
-	g.updateBubbles(Input{})
+	g.Players[0].X, g.Players[0].Y = b.X, b.Y
+	g.updateBubbles([]Input{{}})
 	if g.Enemies[0].State != Defeated || g.Score != 100 {
 		t.Fatalf("pop result: state=%v score=%d", g.Enemies[0].State, g.Score)
 	}
@@ -157,7 +157,7 @@ func TestBubbleCapturePopAndCombo(t *testing.T) {
 	g.Enemies = append(g.Enemies, Enemy{ID: 2, State: Trapped})
 	g.Enemies[0].State = Trapped
 	g.Bubbles = []Bubble{{Body: Body{X: 100, Y: 100}, Age: 30, EnemyID: g.Enemies[0].ID}, {Body: Body{X: 138, Y: 100}, Age: 30, EnemyID: 2}}
-	g.popBubble(0)
+	g.popBubble(0, 0)
 	if g.Score != 300 || !g.Bubbles[1].Removed {
 		t.Fatalf("chain pop failed: score=%d", g.Score)
 	}
@@ -168,14 +168,14 @@ func TestBubbleEscapeAndBounce(t *testing.T) {
 	e := &g.Enemies[0]
 	e.State = Trapped
 	g.Bubbles = []Bubble{{Body: Body{X: 300, Y: 100}, Age: 1500, CapturedAge: 1270, EnemyID: e.ID, Floating: true}}
-	g.updateBubbles(Input{})
+	g.updateBubbles([]Input{{}})
 	if e.State != Active || !e.Angry || len(g.Bubbles) != 0 {
 		t.Fatal("enemy did not escape angry")
 	}
-	g.Player.Body = Body{X: 200, Y: 200 - ActorSize, VY: 3}
+	g.Players[0].Body = Body{X: 200, Y: 200 - ActorSize, VY: 3}
 	g.Bubbles = []Bubble{{Body: Body{X: 200, Y: 200}, Age: 50, Floating: true}}
-	g.updateBubbles(Input{Jump: true})
-	if g.Player.VY >= 0 || len(g.Bubbles) != 1 {
+	g.updateBubbles([]Input{{Jump: true}})
+	if g.Players[0].VY >= 0 || len(g.Bubbles) != 1 {
 		t.Fatal("jumping should bounce without popping")
 	}
 }
@@ -184,17 +184,17 @@ func TestPauseFreezeAndHurry(t *testing.T) {
 	g := testGame(t)
 	g.Paused = true
 	g.Freeze = 100
-	before := g.Player
+	before := g.Players[0]
 	for i := 0; i < 2000; i++ {
 		g.Step(Input{Move: 1, Fire: true, Jump: true})
 	}
-	if g.Tick != 0 || g.LevelTicks != 0 || g.Freeze != 100 || g.Player != before {
+	if g.Tick != 0 || g.LevelTicks != 0 || g.Freeze != 100 || g.Players[0] != before {
 		t.Fatal("pause advanced simulation")
 	}
 	g.Paused = false
 	e := g.Enemies[0]
 	g.Step(Input{Move: 1})
-	if g.Enemies[0] != e || g.Player.X == before.X || g.Freeze != 99 {
+	if g.Enemies[0] != e || g.Players[0].X == before.X || g.Freeze != 99 {
 		t.Fatal("clock should freeze enemies while player can move")
 	}
 	g.Freeze = 0
@@ -207,30 +207,30 @@ func TestPauseFreezeAndHurry(t *testing.T) {
 
 func TestLivesRespawnAndGameOver(t *testing.T) {
 	g := testGame(t)
-	g.Player.Power.Shoes = true
-	g.hurtPlayer()
-	g.hurtPlayer()
-	if g.Lives != 2 || g.Player.Dead != 90 {
+	g.Players[0].Power.Shoes = true
+	g.hurtPlayer(0)
+	g.hurtPlayer(0)
+	if g.Players[0].Lives != 2 || g.Players[0].Dead != 90 {
 		t.Fatal("one collision consumed multiple lives")
 	}
 	for i := 0; i < 90; i++ {
 		g.Step(Input{})
 	}
-	if g.Player.Dead != 0 || g.Player.Invincible == 0 || g.Player.Power.Shoes {
+	if g.Players[0].Dead != 0 || g.Players[0].Invincible == 0 || g.Players[0].Power.Shoes {
 		t.Fatal("invalid respawn")
 	}
-	g.hurtPlayer()
-	if g.Lives != 2 {
+	g.hurtPlayer(0)
+	if g.Players[0].Lives != 2 {
 		t.Fatal("invulnerability ignored")
 	}
-	g.Lives = 1
-	g.Player.Invincible = 0
-	g.hurtPlayer()
+	g.Players[0].Lives = 1
+	g.Players[0].Invincible = 0
+	g.hurtPlayer(0)
 	for i := 0; i < 90; i++ {
 		g.Step(Input{})
 	}
-	if g.State != GameOver || g.Lives != 0 {
-		t.Fatalf("final life did not end run: %v %d", g.State, g.Lives)
+	if g.State != GameOver || g.Players[0].Lives != 0 {
+		t.Fatalf("final life did not end run: %v %d", g.State, g.Players[0].Lives)
 	}
 }
 
@@ -238,34 +238,34 @@ func TestEveryPowerUp(t *testing.T) {
 	for _, power := range PowerUps {
 		t.Run(string(power), func(t *testing.T) {
 			g := testGame(t)
-			transition := g.applyPower(power)
+			transition := g.applyPower(power, 0)
 			switch power {
 			case PinkCandy:
-				if !g.Player.Power.Pink {
+				if !g.Players[0].Power.Pink {
 					t.Fatal("missing range")
 				}
 			case BlueCandy:
-				if !g.Player.Power.Blue {
+				if !g.Players[0].Power.Blue {
 					t.Fatal("missing speed")
 				}
 			case YellowCandy:
-				if !g.Player.Power.Yellow {
+				if !g.Players[0].Power.Yellow {
 					t.Fatal("missing fire rate")
 				}
 			case Shoes:
-				if !g.Player.Power.Shoes {
+				if !g.Players[0].Power.Shoes {
 					t.Fatal("missing shoes")
 				}
 			case CrystalRing:
-				if !g.Player.Power.Crystal {
+				if !g.Players[0].Power.Crystal {
 					t.Fatal("missing ring")
 				}
 			case AmethystRing:
-				if !g.Player.Power.Amethyst {
+				if !g.Players[0].Power.Amethyst {
 					t.Fatal("missing ring")
 				}
 			case RubyRing:
-				if !g.Player.Power.Ruby {
+				if !g.Players[0].Power.Ruby {
 					t.Fatal("missing ring")
 				}
 			case OrangeParasol, RedParasol, PurpleParasol:
@@ -322,7 +322,7 @@ func TestSpecialBubblesAndElementDamage(t *testing.T) {
 				t.Fatalf("spawned %d bubbles, want 2", len(g.Bubbles))
 			}
 			g.Bubbles[0].X, g.Bubbles[0].Y = g.Enemies[0].X, g.Enemies[0].Y
-			g.releaseElement(&g.Bubbles[0])
+			g.releaseElement(&g.Bubbles[0], 0)
 			if element == Fire {
 				g.Effects[0].Ground = true
 			}
@@ -379,7 +379,7 @@ func TestEnemyProjectilesAndCollision(t *testing.T) {
 			e.Kind = kind
 			e.Cooldown = 0
 			e.X = 300
-			e.Y = g.Player.Y
+			e.Y = g.Players[0].Y
 			g.updateEnemies()
 			if len(g.Projectiles) != 1 {
 				t.Fatal("enemy did not shoot")
@@ -391,13 +391,13 @@ func TestEnemyProjectilesAndCollision(t *testing.T) {
 			if kind == Invader && (!p.Laser || p.VX != 0 || p.VY <= 0) {
 				t.Fatal("Invader must shoot downwards")
 			}
-			p.X, p.Y = g.Player.X+8, g.Player.Y+8
-			g.checkPlayerHit()
-			if g.Lives != 2 || !p.Removed {
+			p.X, p.Y = g.Players[0].X+8, g.Players[0].Y+8
+			g.checkPlayerHit(0)
+			if g.Players[0].Lives != 2 || !p.Removed {
 				t.Fatal("projectile did not damage player exactly once")
 			}
-			g.checkPlayerHit()
-			if g.Lives != 2 {
+			g.checkPlayerHit(0)
+			if g.Players[0].Lives != 2 {
 				t.Fatal("projectile dealt repeated damage")
 			}
 		})
@@ -441,14 +441,14 @@ func TestSeededSimulationAcrossCampaign(t *testing.T) {
 			in := Input{Move: 1 - 2*(tick/140%2), Jump: tick%80 < 30, Fire: tick%5 != 0}
 			a.Step(in)
 			b.Step(in)
-			if math.IsNaN(a.Player.X) || a.Player.X < 2*Tile || a.Player.X > Width-2*Tile-ActorSize {
+			if math.IsNaN(a.Players[0].X) || a.Players[0].X < 2*Tile || a.Players[0].X > Width-2*Tile-ActorSize {
 				t.Fatalf("round %d player escaped arena", level.Number)
 			}
 			if len(a.Bubbles) > 130 || len(a.Effects) > 200 || len(a.Projectiles) > 100 {
 				t.Fatal("unbounded entity growth")
 			}
 		}
-		if a.Score != b.Score || a.State != b.State || !reflect.DeepEqual(a.Enemies, b.Enemies) || a.Player != b.Player {
+		if a.Score != b.Score || a.State != b.State || !reflect.DeepEqual(a.Enemies, b.Enemies) || a.Players[0] != b.Players[0] {
 			t.Fatal("simulation is not deterministic")
 		}
 	}

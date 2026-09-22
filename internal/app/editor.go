@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"fmt"
@@ -22,7 +22,7 @@ type editor struct {
 
 var editorTools = []string{"BLOCK", "ERASER", "PLAYER", "FOOD SPAWN", "BONUS SPAWN", "ZEN-CHAN", "MONSTA", "MIGHTA", "PULPUL", "BANEBOU", "INVADER"}
 
-func (a *app) editorButtons() []button {
+func (a *App) editorButtons() []button {
 	var b []button
 	add := func(label, action string, x, y, w int) {
 		b = append(b, button{label, action, image.Rect(x, y, x+w, y+30)})
@@ -51,9 +51,9 @@ func (a *app) editorButtons() []button {
 	return b
 }
 
-func (a *app) updateEditor() {
+func (a *App) updateEditor() {
 	a.updateButtons()
-	if a.page != pageEditor {
+	if a.page != pageEditor || a.ignoreTouch {
 		return
 	}
 	if pressed(ebiten.KeyZ) && held(ebiten.KeyControl, ebiten.KeyMeta) {
@@ -66,13 +66,19 @@ func (a *app) updateEditor() {
 		a.start(true)
 		return
 	}
-	x, y := ebiten.CursorPosition()
-	inside := image.Pt(x, y).In(image.Rect(editorX, editorY, editorX+game.Columns*editorTile, editorY+game.Rows*editorTile))
+	pt := a.scenePoint()
+	x, y := pt.X, pt.Y
 	left, right := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft), ebiten.IsMouseButtonPressed(ebiten.MouseButtonRight)
+	if len(a.touchIDs) > 0 {
+		x, y = ebiten.TouchPosition(a.touchIDs[0])
+		x -= a.controls.SceneX
+		left = true
+	}
 	if !left && !right {
 		a.editor.dragging = false
 		return
 	}
+	inside := image.Pt(x, y).In(image.Rect(editorX, editorY, editorX+game.Columns*editorTile, editorY+game.Rows*editorTile))
 	if !inside {
 		return
 	}
@@ -141,7 +147,7 @@ func (e *editor) paint(c game.Cell, tool int) {
 	}
 }
 
-func (a *app) editorAction(action string) {
+func (a *App) editorAction(action string) {
 	e := &a.editor
 	switch action {
 	case "template-prev":

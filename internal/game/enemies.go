@@ -5,6 +5,7 @@ import "math"
 func (g *Game) updateEnemies() {
 	for i := range g.Enemies {
 		e := &g.Enemies[i]
+		target := g.target(e.Body)
 		e.Age++
 		if e.State == Trapped || e.State == Carried {
 			continue
@@ -41,15 +42,15 @@ func (g *Game) updateEnemies() {
 						e.VY = -10
 					}
 				case ZenChan, Mighta:
-					if e.Cooldown == 0 && g.Player.Y < e.Y-Tile {
+					if e.Cooldown == 0 && target.Y < e.Y-Tile {
 						e.VY = -11.5
-						e.Dir = direction(g.Player.X - e.X)
+						e.Dir = direction(target.X - e.X)
 						e.Cooldown = 60
 					}
 				}
 			}
-			if e.Kind == Mighta && e.Cooldown == 0 && math.Abs(e.Y-g.Player.Y) < Tile && g.Player.Dead == 0 {
-				e.Dir = direction(g.Player.X - e.X)
+			if e.Kind == Mighta && e.Cooldown == 0 && math.Abs(e.Y-target.Y) < Tile && target.Alive() {
+				e.Dir = direction(target.X - e.X)
 				g.Projectiles = append(g.Projectiles, Projectile{Body: Body{X: e.X + 20 + float64(e.Dir)*24, Y: e.Y + 14, VX: float64(e.Dir) * 6}})
 				e.Cooldown, e.Shoot = 180, 30
 			}
@@ -100,4 +101,17 @@ func (g *Game) updateProjectiles() {
 		}
 	}
 	g.Projectiles = kept
+}
+
+func (g *Game) target(body Body) Player {
+	best := math.MaxFloat64
+	target := g.Players[0]
+	for _, p := range g.Players {
+		distance := math.Abs(p.X-body.X) + math.Abs(p.Y-body.Y)
+		if p.Alive() && distance < best {
+			best = distance
+			target = p
+		}
+	}
+	return target
 }

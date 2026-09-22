@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"fmt"
@@ -23,7 +23,7 @@ var (
 	yellow = color.RGBA{255, 220, 106, 255}
 )
 
-func (a *app) Draw(screen *ebiten.Image) {
+func (a *App) drawScene(screen *ebiten.Image) {
 	screen.Fill(ink)
 	switch a.page {
 	case pageTitle, pageMenu:
@@ -47,6 +47,8 @@ func (a *app) Draw(screen *ebiten.Image) {
 		a.drawCredits(screen)
 	case pageEditor:
 		a.drawEditor(screen)
+	case pageBluetooth:
+		a.drawBluetooth(screen)
 	}
 	for i, b := range a.buttons() {
 		a.drawButton(screen, b, i == a.selected)
@@ -55,17 +57,7 @@ func (a *app) Draw(screen *ebiten.Image) {
 		box(screen, 0, 680, screenWidth, 40, panel)
 		a.center(screen, strings.ToUpper(a.status), 12, 700, yellow)
 	}
-	if a.smokeFrames > 0 && a.frame >= a.smokeFrames && a.capturePath != "" && !a.captured {
-		f, err := os.Create(a.capturePath)
-		if err == nil {
-			err = png.Encode(f, screen)
-			if closeErr := f.Close(); err == nil {
-				err = closeErr
-			}
-		}
-		a.captureErr = err
-		a.captured = true
-	}
+
 }
 
 func box(dst *ebiten.Image, x, y, w, h float64, c color.Color) {
@@ -88,11 +80,11 @@ func drawImage(dst, src *ebiten.Image, x, y, w, h float64, flip bool) {
 	dst.DrawImage(src, op)
 }
 
-func (a *app) sprite(dst *ebiten.Image, name string, tick int, x, y, size float64, dir int) {
+func (a *App) sprite(dst *ebiten.Image, name string, tick int, x, y, size float64, dir int) {
 	drawImage(dst, a.art.frame(name, tick), x, y, size, size, dir > 0)
 }
 
-func (a *app) label(dst *ebiten.Image, s string, size, x, y float64, c color.Color) {
+func (a *App) label(dst *ebiten.Image, s string, size, x, y float64, c color.Color) {
 	op := &text.DrawOptions{}
 	op.GeoM.Translate(x, y)
 	op.ColorScale.ScaleWithColor(c)
@@ -100,7 +92,7 @@ func (a *app) label(dst *ebiten.Image, s string, size, x, y float64, c color.Col
 	text.Draw(dst, s, &text.GoTextFace{Source: a.art.font, Size: size}, op)
 }
 
-func (a *app) center(dst *ebiten.Image, s string, size, y float64, c color.Color) {
+func (a *App) center(dst *ebiten.Image, s string, size, y float64, c color.Color) {
 	face := &text.GoTextFace{Source: a.art.font, Size: size}
 	w, _ := text.Measure(s, face, size*1.65)
 	if w > screenWidth-40 {
@@ -110,7 +102,7 @@ func (a *app) center(dst *ebiten.Image, s string, size, y float64, c color.Color
 	a.label(dst, s, size, (screenWidth-w)/2, y, c)
 }
 
-func (a *app) heading(dst *ebiten.Image, title, subtitle string) {
+func (a *App) heading(dst *ebiten.Image, title, subtitle string) {
 	box(dst, 24, 30, 36, 4, green)
 	a.label(dst, "BUBBLE BOBBLE", 11, 76, 26, green)
 	a.center(dst, title, 28, 65, white)
@@ -119,7 +111,7 @@ func (a *app) heading(dst *ebiten.Image, title, subtitle string) {
 	}
 }
 
-func (a *app) drawButton(dst *ebiten.Image, b button, selected bool) {
+func (a *App) drawButton(dst *ebiten.Image, b button, selected bool) {
 	x, y, w, h := float64(b.bounds.Min.X), float64(b.bounds.Min.Y), float64(b.bounds.Dx()), float64(b.bounds.Dy())
 	bg, fg := panel, white
 	if selected {
@@ -139,7 +131,7 @@ func (a *app) drawButton(dst *ebiten.Image, b button, selected bool) {
 	a.label(dst, b.label, size, x+(w-tw)/2, y+(h-size)/2, fg)
 }
 
-func (a *app) drawMenu(dst *ebiten.Image) {
+func (a *App) drawMenu(dst *ebiten.Image) {
 	for i := 0; i < 18; i++ {
 		x := float64((i*137 + 39) % screenWidth)
 		y := float64((i*91 - a.frame/2) % screenHeight)
@@ -162,7 +154,7 @@ func (a *app) drawMenu(dst *ebiten.Image) {
 	a.center(dst, "ARROWS TO SELECT   ENTER TO CONFIRM", 10, 678, muted)
 }
 
-func (a *app) drawMatch(dst *ebiten.Image) {
+func (a *App) drawMatch(dst *ebiten.Image) {
 	g := a.match
 	const offset = 48
 	box(dst, 0, offset, game.Width, game.Height, color.Black)
@@ -184,6 +176,7 @@ func (a *app) drawMatch(dst *ebiten.Image) {
 		a.sprite(dst, name, 0, item.X, item.Y+offset, 32, -1)
 	}
 	for _, e := range g.Enemies {
+		e.Body = a.renderBody(e.ID, e.Body)
 		if e.State == game.Trapped || e.State == game.Defeated && e.DeadTicks == 0 {
 			continue
 		}
@@ -203,6 +196,7 @@ func (a *app) drawMatch(dst *ebiten.Image) {
 		a.sprite(dst, string(e.Kind)+"/"+state, e.Age, e.X, e.Y+offset, 48, e.Dir)
 	}
 	for _, b := range g.Bubbles {
+		b.Body = a.renderBody(b.ID, b.Body)
 		name := "bubble"
 		tick := min(b.Age, 30)
 		if b.Element != "" {
@@ -245,20 +239,27 @@ func (a *app) drawMatch(dst *ebiten.Image) {
 		}
 		drawImage(dst, a.art.frame(name, e.Age), e.X, e.Y+offset, 40, 32, e.Dir > 0)
 	}
-	p := g.Player
-	if p.Invincible == 0 || p.Invincible%12 < 6 {
-		state, tick := "walk", p.WalkFrame
-		if !p.Ground {
-			state, tick = "jump", g.Tick
+	for player, p := range g.Players {
+		p.Body = a.renderBody(-player-1, p.Body)
+		if p.Lives == 0 && p.Dead == 0 {
+			continue
 		}
-		if p.Shoot > 0 {
-			state, tick = "shoot", 12-p.Shoot
+
+		if p.Invincible == 0 || p.Invincible%12 < 6 {
+			state, tick := "walk", p.WalkFrame
+			if !p.Ground {
+				state, tick = "jump", g.Tick
+			}
+			if p.Shoot > 0 {
+				state, tick = "shoot", 12-p.Shoot
+			}
+			if p.Dead > 0 {
+				state, tick = "dead", 90-p.Dead
+			}
+			a.sprite(dst, a.avatar(player)+"/"+state, tick, p.X, p.Y+offset, 48, p.Dir)
 		}
-		if p.Dead > 0 {
-			state, tick = "dead", 90-p.Dead
-		}
-		a.sprite(dst, a.store.Profile().Avatar+"/"+state, tick, p.X, p.Y+offset, 48, p.Dir)
 	}
+	p := g.Players[a.playerIndex()]
 	for _, p := range g.Particles {
 		if p.Text != "" {
 			a.label(dst, p.Text, 12, p.X, p.Y+offset, yellow)
@@ -267,16 +268,29 @@ func (a *app) drawMatch(dst *ebiten.Image) {
 		}
 	}
 	box(dst, 0, 0, screenWidth, 48, ink)
-	a.label(dst, a.store.Profile().Name, 10, 24, 7, green)
+	name := a.store.Profile().Name
+	if len(g.Players) == 2 {
+		name = "TEAM SCORE"
+	}
+	a.label(dst, name, 10, 24, 7, green)
 	a.label(dst, fmt.Sprintf("%07d", g.Score), 20, 24, 22, white)
 	a.center(dst, fmt.Sprintf("ROUND %02d", g.Level.Number), 18, 18, yellow)
 	a.label(dst, "HIGH SCORE", 10, 590, 7, pink)
 	a.label(dst, fmt.Sprintf("%07d", max(g.Score, a.store.Profile().HighScore)), 20, 590, 22, white)
 	box(dst, 0, 672, screenWidth, 48, ink)
-	a.sprite(dst, a.store.Profile().Avatar+"/walk", 0, 20, 680, 28, -1)
-	a.label(dst, fmt.Sprintf("x%d", g.Lives), 14, 54, 687, white)
-	a.label(dst, fmt.Sprintf("ENEMIES %02d", g.RemainingEnemies()), 11, 140, 690, muted)
-	a.label(dst, "ESC PAUSE  M SOUND", 11, 530, 690, muted)
+	a.sprite(dst, a.avatar(0)+"/walk", 0, 20, 680, 28, -1)
+	a.label(dst, fmt.Sprintf("x%d", g.Players[0].Lives), 14, 54, 687, white)
+	if len(g.Players) == 2 {
+		a.sprite(dst, "blue/walk", 0, 126, 680, 28, -1)
+		a.label(dst, fmt.Sprintf("x%d", g.Players[1].Lives), 14, 160, 687, white)
+	} else {
+		a.label(dst, fmt.Sprintf("ENEMIES %02d", g.RemainingEnemies()), 11, 140, 690, muted)
+	}
+	footer := "ESC PAUSE  M SOUND"
+	if a.touchEnabled {
+		footer = "PAD UP: JUMP"
+	}
+	a.label(dst, footer, 11, 530, 690, muted)
 	x := 320.0
 	for _, power := range []struct {
 		active bool
@@ -306,7 +320,7 @@ func (a *app) drawMatch(dst *ebiten.Image) {
 	}
 }
 
-func (a *app) banner(dst *ebiten.Image, title, subtitle string, y float64) {
+func (a *App) banner(dst *ebiten.Image, title, subtitle string, y float64) {
 	box(dst, 108, y, 552, 82, color.RGBA{8, 12, 27, 230})
 	a.center(dst, title, 24, y+15, yellow)
 	if subtitle != "" {
@@ -314,7 +328,7 @@ func (a *app) banner(dst *ebiten.Image, title, subtitle string, y float64) {
 	}
 }
 
-func (a *app) drawResult(dst *ebiten.Image) {
+func (a *App) drawResult(dst *ebiten.Image) {
 	box(dst, 0, 0, screenWidth, screenHeight, color.RGBA{0, 0, 0, 220})
 	title, sub := "GAME OVER", "A NEW ADVENTURE IS ONE BUBBLE AWAY."
 	if a.match.State == game.Won {
@@ -324,6 +338,9 @@ func (a *app) drawResult(dst *ebiten.Image) {
 		sub = "CUSTOM LEVEL PLAY TEST COMPLETE"
 	}
 	a.center(dst, title, 44, 168, green)
+	if a.peer != nil && !a.netHost {
+		a.center(dst, "WAITING FOR THE HOST TO RESTART", 12, 460, green)
+	}
 	a.center(dst, sub, 13, 252, white)
 	a.center(dst, fmt.Sprintf("SCORE  %07d", a.match.Score), 26, 312, yellow)
 	p := a.store.Profile()
@@ -332,7 +349,7 @@ func (a *app) drawResult(dst *ebiten.Image) {
 	}
 }
 
-func (a *app) drawProfiles(dst *ebiten.Image) {
+func (a *App) drawProfiles(dst *ebiten.Image) {
 	a.heading(dst, "PLAYER PROFILES", "SELECT A PLAYER OR CREATE A NEW PROFILE")
 	for i, p := range a.store.Data.Profiles {
 		a.sprite(dst, p.Avatar+"/walk", a.frame, 114, float64(132+i*46), 36, 1)
@@ -340,17 +357,17 @@ func (a *app) drawProfiles(dst *ebiten.Image) {
 	a.center(dst, "PROGRESS AND HIGH SCORES ARE SAVED AUTOMATICALLY", 10, 680, muted)
 }
 
-func (a *app) drawNewProfile(dst *ebiten.Image) {
+func (a *App) drawNewProfile(dst *ebiten.Image) {
 	a.heading(dst, "NEW PLAYER", "YOUR NAME: UP TO 16 LETTERS OR NUMBERS")
-	box(dst, 164, 254, 440, 70, panel)
+	box(dst, 104, 154, 552, 70, panel)
 	name := a.name
 	if a.frame%60 < 30 {
 		name += "_"
 	}
-	a.center(dst, name, 22, 278, green)
+	a.center(dst, name, 22, 178, green)
 }
 
-func (a *app) drawScores(dst *ebiten.Image) {
+func (a *App) drawScores(dst *ebiten.Image) {
 	a.heading(dst, "HIGH SCORES", "LOCAL PLAYERS / ALL CAMPAIGN RUNS")
 	a.label(dst, "PLAYER", 12, 104, 166, muted)
 	a.label(dst, "SCORE", 12, 354, 166, muted)
@@ -366,7 +383,7 @@ func (a *app) drawScores(dst *ebiten.Image) {
 	}
 }
 
-func (a *app) drawSettings(dst *ebiten.Image) {
+func (a *App) drawSettings(dst *ebiten.Image) {
 	a.heading(dst, "SETTINGS", "ENTER TO CHANGE / LEFT AND RIGHT TO ADJUST")
 	p := a.store.Profile()
 	a.sprite(dst, p.Avatar+"/walk", a.frame, 336, 476, 96, -1)
@@ -374,7 +391,7 @@ func (a *app) drawSettings(dst *ebiten.Image) {
 	a.center(dst, fmt.Sprintf("PLAYED %d  WON %d  LOST %d  XP %d", p.Played, p.Won, p.Lost, p.XP), 10, 622, muted)
 }
 
-func (a *app) drawHelp(dst *ebiten.Image) {
+func (a *App) drawHelp(dst *ebiten.Image) {
 	a.heading(dst, "HOW TO PLAY", "TRAP THE ENEMIES. POP THE BUBBLES. COLLECT THE FRUIT.")
 	lines := []struct{ title, detail string }{
 		{"MOVE", "LEFT / RIGHT OR A / D"},
@@ -393,7 +410,7 @@ func (a *app) drawHelp(dst *ebiten.Image) {
 	}
 }
 
-func (a *app) drawCredits(dst *ebiten.Image) {
+func (a *App) drawCredits(dst *ebiten.Image) {
 	a.heading(dst, "CREDITS", "A FAN REMAKE OF THE ARCADE CLASSIC")
 	for i, line := range []string{"ORIGINAL GAME AND CHARACTERS", "TAITO", "", "GAME ADAPTATION AND LEVEL DESIGN", "MALAKH SOFTWARE - 2026", "", "GO EDITION POWERED BY EBITENGINE", "", "SOFTWARE LICENSE: MIT", "ARTWORK AND AUDIO BELONG TO THEIR OWNERS"} {
 		c := white
@@ -404,7 +421,7 @@ func (a *app) drawCredits(dst *ebiten.Image) {
 	}
 }
 
-func (a *app) drawEditor(dst *ebiten.Image) {
+func (a *App) drawEditor(dst *ebiten.Image) {
 	a.heading(dst, "LEVEL EDITOR", "")
 	e := &a.editor
 	box(dst, editorX, editorY, game.Columns*editorTile, game.Rows*editorTile, color.Black)
@@ -433,7 +450,8 @@ func (a *app) drawEditor(dst *ebiten.Image) {
 	drawSpawn(e.level.Player, a.store.Profile().Avatar+"/walk", "P")
 	drawSpawn(e.level.FoodSpawn, "food/1", "F")
 	drawSpawn(e.level.PowerSpawn, "pink_candy", "B")
-	x, y := ebiten.CursorPosition()
+	pt := a.scenePoint()
+	x, y := pt.X, pt.Y
 	if x >= editorX+2*editorTile && x < editorX+(game.Columns-2)*editorTile && y >= editorY && y < editorY+game.Rows*editorTile {
 		x = editorX + (x-editorX)/editorTile*editorTile
 		y = editorY + (y-editorY)/editorTile*editorTile
@@ -442,4 +460,24 @@ func (a *app) drawEditor(dst *ebiten.Image) {
 	a.label(dst, "LEFT: DRAW   RIGHT: ERASE   CTRL-Z: UNDO", 10, 24, 572, muted)
 	a.label(dst, fmt.Sprintf("ENEMIES %02d / 32", len(e.level.Enemies)), 10, 554, 550, green)
 	a.center(dst, "F5 PLAY TEST / ESC RETURN / P PLAYER / F FOOD / B BONUS", 10, 693, muted)
+}
+
+func (a *App) Draw(screen *ebiten.Image) {
+	a.drawScene(a.canvas)
+	screen.Fill(ink)
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Translate(float64(a.controls.SceneX), 0)
+	screen.DrawImage(a.canvas, op)
+	a.drawControls(screen)
+	if a.smokeFrames > 0 && a.frame >= a.smokeFrames && a.capturePath != "" && !a.captured {
+		f, err := os.Create(a.capturePath)
+		if err == nil {
+			err = png.Encode(f, screen)
+			if closeErr := f.Close(); err == nil {
+				err = closeErr
+			}
+		}
+		a.captureErr = err
+		a.captured = true
+	}
 }

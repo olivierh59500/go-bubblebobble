@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"bubblebobble/internal/game"

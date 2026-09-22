@@ -124,25 +124,35 @@ func (g *Game) updateItems() bool {
 				item.VY = 0
 			}
 		}
-		if g.Player.Dead == 0 && intersects(g.Player.X, g.Player.Y, ActorSize, ActorSize, item.X, item.Y, 32, 32) {
+		collected := false
+		for player := range g.Players {
+			p := g.Players[player]
+			if !p.Alive() || !intersects(p.X, p.Y, ActorSize, ActorSize, item.X, item.Y, 32, 32) {
+				continue
+			}
 			if item.Power != "" {
-				if g.applyPower(item.Power) {
+				if g.applyPower(item.Power, player) {
 					return true
 				}
 			} else {
 				g.addScore(FoodScore(item.Food), item.X, item.Y)
 				g.Sounds = append(g.Sounds, "food")
 			}
+			collected = true
+			break
+		}
+		if collected {
 			continue
 		}
+
 		kept = append(kept, item)
 	}
 	g.Items = kept
 	return false
 }
 
-func (g *Game) applyPower(power PowerUp) bool {
-	p := &g.Player.Power
+func (g *Game) applyPower(power PowerUp, player int) bool {
+	p := &g.Players[player].Power
 	points, warp := 100, 0
 	switch power {
 	case PinkCandy:
@@ -187,7 +197,7 @@ func (g *Game) applyPower(power PowerUp) bool {
 		points = 200
 		g.Freeze = 7 * TPS
 	}
-	g.addScore(points, g.Player.X, g.Player.Y)
+	g.addScore(points, g.Players[player].X, g.Players[player].Y)
 	g.Sounds = append(g.Sounds, "item")
 	if warp > 0 {
 		g.loadLevel(g.LevelIndex + warp)

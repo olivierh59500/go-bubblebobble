@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"fmt"
@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"bubblebobble/internal/game"
+	"bubblebobble/internal/netplay"
+	"bubblebobble/internal/platform"
 	"bubblebobble/internal/save"
 	"bubblebobble/resources"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -27,6 +29,7 @@ const (
 	pageEditor
 	pagePlay
 	pageResult
+	pageBluetooth
 )
 
 type button struct {
@@ -34,7 +37,28 @@ type button struct {
 	bounds        image.Rectangle
 }
 
-type app struct {
+type App struct {
+	renderPositions           map[int]game.Body
+	renderFrame               int
+	netFinalRun               int
+	mobile, touchEnabled      bool
+	controls                  controlsLayout
+	touch                     controlsState
+	touchIDs                  []ebiten.TouchID
+	canvas                    *ebiten.Image
+	bridge                    *platform.Bridge
+	inputSerial               uint64
+	ignoreTouch, platformBack bool
+	peer                      *netplay.Peer
+	pending                   *netplay.Pending
+	netHost                   bool
+	netGeneration             int64
+	netRun                    int
+	netToken                  []byte
+	netStatus                 string
+	netSounds                 []string
+	playerNames               [2]string
+
 	art             *artwork
 	audio           *soundSystem
 	store           *save.Store
@@ -55,7 +79,7 @@ type app struct {
 	quit            bool
 }
 
-func newApp(directory string, muted bool) (*app, error) {
+func New(directory string, muted bool) (*App, error) {
 	levels, err := game.LoadCampaign(resources.Files)
 	if err != nil {
 		return nil, err
@@ -73,20 +97,20 @@ func newApp(directory string, muted bool) (*app, error) {
 		return nil, err
 	}
 	audio.setVolumes(store.Data.Settings.Music, store.Data.Settings.Sound)
-	a := &app{art: art, audio: audio, store: store, levels: levels, page: pageTitle, mouseX: -1, mouseY: -1}
+	a := &App{art: art, audio: audio, store: store, levels: levels, page: pageTitle, mouseX: -1, mouseY: -1, bridge: &platform.Bridge{}, canvas: ebiten.NewImage(screenWidth, screenHeight), controls: makeControls(screenWidth, screenHeight, false)}
 	a.editor.level = levels[0].Clone()
 	return a, nil
 }
 
-func (a *app) navigate(p page)  { a.page = p; a.selected = 0 }
-func (a *app) message(s string) { a.status = s; a.statusTicks = 300 }
-func (a *app) persist() {
+func (a *App) navigate(p page)  { a.page = p; a.selected = 0 }
+func (a *App) message(s string) { a.status = s; a.statusTicks = 300 }
+func (a *App) persist() {
 	if err := a.store.Write(); err != nil {
 		a.message("SAVE FAILED: " + err.Error())
 	}
 }
 
-func (a *app) start(custom bool) {
+func (a *App) start(custom bool) {
 	levels := a.levels
 	if custom {
 		if err := a.editor.level.Validate(); err != nil {
@@ -106,7 +130,7 @@ func (a *app) start(custom bool) {
 	a.navigate(pagePlay)
 }
 
-func (a *app) record(won bool) {
+func (a *App) record(won bool) {
 	if a.recorded || a.match == nil || a.match.Custom || a.smokeFrames > 0 {
 		return
 	}
@@ -116,14 +140,26 @@ func (a *app) record(won bool) {
 	}
 }
 
-func (a *app) Update() error {
+func (a *App) Update() error {
 	if a.captureErr != nil {
 		return a.captureErr
 	}
-	if a.quit || ebiten.IsWindowBeingClosed() {
+	if a.quit || !a.mobile && ebiten.IsWindowBeingClosed() {
 		a.persist()
+		a.stopNetwork()
+		if a.mobile {
+			a.bridge.Queue("APP_EXIT")
+			a.quit = false
+			return nil
+		}
 		return ebiten.Termination
 	}
+	a.platformBack = a.bridge.Back.Swap(false)
+	a.readTouch()
+	if a.bridge.Pause.Swap(false) && a.page == pagePlay {
+		a.setPaused(true)
+	}
+	a.updateNetwork()
 	a.frame++
 	if a.smokeFrames > 0 && a.frame >= a.smokeFrames {
 		if a.capturePath == "" || a.captured {
@@ -145,26 +181,28 @@ func (a *app) Update() error {
 	track, paused := "menu", false
 	switch a.page {
 	case pageTitle:
-		if confirmPressed() || inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+		_, _, tap := a.pointerPressed()
+		if confirmPressed() || tap {
 			a.navigate(pageMenu)
 		}
 	case pagePlay:
-		if a.smokeFrames == 0 && !ebiten.IsFocused() {
-			a.match.Paused = true
+		if !a.mobile && a.smokeFrames == 0 && !ebiten.IsFocused() {
+			a.setPaused(true)
 		}
-		if backPressed() || padButton(ebiten.StandardGamepadButtonCenterRight, true) {
-			a.match.Paused = !a.match.Paused
+		if a.backPressed() || padButton(ebiten.StandardGamepadButtonCenterRight, true) {
+			a.setPaused(!a.match.Paused)
 			a.selected = 0
 		} else if a.match.Paused {
 			a.updateButtons()
 		} else {
-			in := playInput()
+			in := a.controlInput()
 			if a.smokeFrames > 0 {
 				in = game.Input{Move: 1, Fire: true, Jump: a.frame%90 < 30}
 			}
-			a.match.Step(in)
+			a.advanceMatch(in)
 			for _, sound := range a.match.Sounds {
 				a.audio.play(sound)
+				a.netSounds = append(a.netSounds, sound)
 			}
 			if a.match.State == game.Won || a.match.State == game.GameOver {
 				a.record(a.match.State == game.Won)
@@ -177,7 +215,10 @@ func (a *app) Update() error {
 		}
 		paused = a.match.Paused
 	case pageResult:
-		track = "opening"
+		track = "gameover"
+		if a.match.State == game.Won {
+			track = "win"
+		}
 		a.updateButtons()
 	case pageNewProfile:
 		for _, r := range ebiten.AppendInputChars(nil) {
@@ -189,28 +230,36 @@ func (a *app) Update() error {
 		if len(a.name) > 0 && (n == 1 || n > 30 && n%3 == 0) {
 			a.name = a.name[:len(a.name)-1]
 		}
-		if backPressed() {
+		if a.backPressed() {
 			a.navigate(pageProfiles)
 		} else {
 			a.updateButtons()
 		}
+	case pageBluetooth:
+		if a.backPressed() {
+			a.stopNetwork()
+			a.navigate(pageMenu)
+		} else {
+			a.updateButtons()
+		}
 	case pageEditor:
-		if backPressed() {
+		if a.backPressed() {
 			a.navigate(pageMenu)
 		} else {
 			a.updateEditor()
 		}
 	default:
-		if backPressed() {
+		if a.backPressed() {
 			a.navigate(pageMenu)
 		} else {
 			a.updateButtons()
 		}
 	}
+	a.publishNetwork()
 	return a.audio.update(track, paused)
 }
 
-func (a *app) updateButtons() {
+func (a *App) updateButtons() {
 	buttons := a.buttons()
 	if len(buttons) == 0 {
 		return
@@ -222,7 +271,8 @@ func (a *app) updateButtons() {
 		a.selected = (a.selected + 1) % len(buttons)
 	}
 	a.selected = min(a.selected, len(buttons)-1)
-	x, y := ebiten.CursorPosition()
+	pt := a.scenePoint()
+	x, y := pt.X, pt.Y
 	if x != a.mouseX || y != a.mouseY {
 		for i, b := range buttons {
 			if image.Pt(x, y).In(b.bounds) {
@@ -243,7 +293,8 @@ func (a *app) updateButtons() {
 		a.adjustSetting(buttons[a.selected].action, delta)
 		return
 	}
-	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+	if tx, ty, tap := a.pointerPressed(); tap {
+		x, y = tx, ty
 		activate = false
 		for i, b := range buttons {
 			if image.Pt(x, y).In(b.bounds) {
@@ -258,7 +309,7 @@ func (a *app) updateButtons() {
 	}
 }
 
-func (a *app) buttons() []button {
+func (a *App) buttons() []button {
 	var b []button
 	add := func(label, action string, x, y, w, h int) {
 		b = append(b, button{label, action, image.Rect(x, y, x+w, y+h)})
@@ -276,7 +327,12 @@ func (a *app) buttons() []button {
 		for i, label := range labels {
 			add(label, actions[i], 104+(i%2)*290, 392+(i/2)*52, 270, 38)
 		}
-		add("QUIT", "quit", 264, 570, 240, 38)
+		if a.mobile {
+			add("BLUETOOTH CO-OP", "bluetooth", 218, 552, 332, 38)
+			add("QUIT", "quit", 264, 604, 240, 38)
+		} else {
+			add("QUIT", "quit", 264, 570, 240, 38)
+		}
 	case pageProfiles:
 		for i, p := range a.store.Data.Profiles {
 			label := p.Name
@@ -288,37 +344,60 @@ func (a *app) buttons() []button {
 		add("NEW PROFILE", "new-profile", 164, 532, 440, 38)
 		add("BACK", "menu", 264, 594, 240, 38)
 	case pageNewProfile:
-		list([]string{"CREATE PROFILE", "CANCEL"}, []string{"create-profile", "profiles"}, 388)
+		for i, r := range "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" {
+			add(string(r), "char:"+string(r), 104+(i%10)*56, 252+(i/10)*48, 48, 38)
+		}
+		add("SPACE", "char: ", 440, 396, 104, 38)
+		add("DEL", "delete-char", 552, 396, 104, 38)
+		list([]string{"CREATE PROFILE", "CANCEL"}, []string{"create-profile", "profiles"}, 520)
 	case pageSettings:
 		s := a.store.Data.Settings
 		full := "OFF"
 		if s.Fullscreen {
 			full = "ON"
 		}
-		list([]string{"DRAGON: " + strings.ToUpper(a.store.Profile().Avatar), fmt.Sprintf("MUSIC: %d%%", s.Music), fmt.Sprintf("SOUND: %d%%", s.Sound), "FULLSCREEN: " + full, "BACK"}, []string{"avatar", "music", "sound", "fullscreen", "menu"}, 180)
+		if a.mobile {
+			list([]string{"DRAGON: " + strings.ToUpper(a.store.Profile().Avatar), fmt.Sprintf("MUSIC: %d%%", s.Music), fmt.Sprintf("SOUND: %d%%", s.Sound), "BACK"}, []string{"avatar", "music", "sound", "menu"}, 180)
+		} else {
+			list([]string{"DRAGON: " + strings.ToUpper(a.store.Profile().Avatar), fmt.Sprintf("MUSIC: %d%%", s.Music), fmt.Sprintf("SOUND: %d%%", s.Sound), "FULLSCREEN: " + full, "BACK"}, []string{"avatar", "music", "sound", "fullscreen", "menu"}, 180)
+		}
 	case pageScores, pageHelp, pageCredits:
 		add("BACK", "menu", 264, 624, 240, 38)
+	case pageBluetooth:
+		if a.pending != nil || len(a.netToken) > 0 {
+			list([]string{"CANCEL"}, []string{"bt-back"}, 370)
+		} else {
+			list([]string{"HOST A GAME", "JOIN A GAME", "BACK"}, []string{"bt-host", "bt-join", "bt-back"}, 320)
+		}
 	case pagePlay:
 		if a.match.Paused {
 			last := "END RUN"
 			if a.match.Custom {
 				last = "BACK TO EDITOR"
 			}
-			list([]string{"RESUME", "RESTART", last}, []string{"resume", "restart", "leave"}, 320)
+			if a.peer != nil && !a.netHost {
+				list([]string{"RESUME", last}, []string{"resume", "leave"}, 320)
+			} else {
+				list([]string{"RESUME", "RESTART", last}, []string{"resume", "restart", "leave"}, 320)
+			}
 		}
 	case pageResult:
 		last := "MAIN MENU"
 		if a.match.Custom {
 			last = "BACK TO EDITOR"
 		}
-		list([]string{"PLAY AGAIN", last}, []string{"restart", "leave"}, 450)
+		if a.peer != nil && !a.netHost {
+			list([]string{last}, []string{"leave"}, 500)
+		} else {
+			list([]string{"PLAY AGAIN", last}, []string{"restart", "leave"}, 450)
+		}
 	case pageEditor:
 		return a.editorButtons()
 	}
 	return b
 }
 
-func (a *app) activate(action string) {
+func (a *App) activate(action string) {
 	switch action {
 	case "start":
 		a.start(false)
@@ -348,20 +427,48 @@ func (a *app) activate(action string) {
 	case "avatar", "music", "sound", "fullscreen":
 		a.adjustSetting(action, 25)
 	case "resume":
-		a.match.Paused = false
+		a.setPaused(false)
 	case "restart":
+		if a.peer != nil {
+			if a.netHost {
+				a.startCoop()
+			} else {
+				a.message("THE HOST CAN RESTART THE MATCH")
+			}
+			return
+		}
 		a.record(false)
 		a.start(a.match.Custom)
 	case "leave":
 		a.record(false)
+		a.stopNetwork()
 		if a.match.Custom {
 			a.navigate(pageEditor)
 		} else {
 			a.navigate(pageMenu)
 		}
+	case "bluetooth":
+		a.navigate(pageBluetooth)
+	case "bt-host":
+		a.beginBluetooth(true)
+	case "bt-join":
+		a.beginBluetooth(false)
+	case "bt-back":
+		a.stopNetwork()
+		a.navigate(pageMenu)
+	case "delete-char":
+		if len(a.name) > 0 {
+			a.name = a.name[:len(a.name)-1]
+		}
 	case "quit":
 		a.quit = true
 	default:
+		if strings.HasPrefix(action, "char:") {
+			if len(a.name) < 16 {
+				a.name += strings.TrimPrefix(action, "char:")
+			}
+			return
+		}
 		if strings.HasPrefix(action, "profile:") {
 			var index int
 			if _, err := fmt.Sscanf(action, "profile:%d", &index); err == nil && index >= 0 && index < len(a.store.Data.Profiles) {
@@ -375,7 +482,7 @@ func (a *app) activate(action string) {
 	}
 }
 
-func (a *app) adjustSetting(action string, delta int) {
+func (a *App) adjustSetting(action string, delta int) {
 	s := &a.store.Data.Settings
 	switch action {
 	case "avatar":
@@ -399,11 +506,11 @@ func (a *app) adjustSetting(action string, delta int) {
 	a.persist()
 }
 
-func (a *app) setupSmoke(scene string, round int) error {
+func (a *App) SetupSmoke(scene string, round int) error {
 	switch scene {
 	case "menu":
 		a.navigate(pageMenu)
-	case "game", "pause", "win", "gameover":
+	case "game", "coop", "pause", "win", "gameover":
 		if round < 1 || round > len(a.levels) {
 			return fmt.Errorf("invalid smoke round")
 		}
@@ -412,6 +519,9 @@ func (a *app) setupSmoke(scene string, round int) error {
 			return err
 		}
 		a.match = g
+		if scene == "coop" {
+			a.match, _ = game.NewPlayers(a.levels[round-1:], 1, 2)
+		}
 		a.navigate(pagePlay)
 		if scene == "pause" {
 			a.match.Paused = true
@@ -435,10 +545,12 @@ func (a *app) setupSmoke(scene string, round int) error {
 		a.navigate(pageHelp)
 	case "credits":
 		a.navigate(pageCredits)
+	case "bluetooth":
+		a.navigate(pageBluetooth)
+	case "new-profile":
+		a.navigate(pageNewProfile)
 	default:
 		return fmt.Errorf("unknown smoke scene %q", scene)
 	}
 	return nil
 }
-
-func (*app) Layout(int, int) (int, int) { return screenWidth, screenHeight }

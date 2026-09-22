@@ -1,12 +1,15 @@
 GO ?= go
 
-.PHONY: build run test check web
+.PHONY: build run test check web android
 
 build:
 	$(GO) build -o bubblebobble .
 
 run:
 	$(GO) run .
+
+android:
+	./scripts/build-android.sh
 
 test:
 	$(GO) test ./...

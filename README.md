@@ -1,8 +1,8 @@
 # Bubble Bobble
 
-A single-player arcade game in Go, powered by Ebitengine 2.10.2. Clear 25 rounds by trapping enemies in bubbles and popping them. Choose the green or blue dragon in your profile settings.
+An arcade game in Go, powered by Ebitengine 2.10.2, with solo play and cooperative play between two Android phones over Bluetooth. Clear 25 rounds by trapping enemies in bubbles and popping them. Choose the green or blue dragon in your solo profile settings.
 
-The campaign includes all 25 tile maps and 140 enemy placements, six enemy types (Zen-Chan, Monsta, Mighta, Pulpul, Banebou and Invader), boulders and lasers, water/lightning/fire bubbles, twelve power-ups, fruit, chain bonuses, three lives, respawning, hurry-up mode, and victory and game-over screens. Menus, a pause screen, local profiles, a leaderboard, audio settings and a level editor are included.
+The campaign includes all 25 tile maps and 140 enemy placements, six enemy types (Zen-Chan, Monsta, Mighta, Pulpul, Banebou and Invader), boulders and lasers, water/lightning/fire bubbles, twelve power-ups, fruit, chain bonuses, three lives, respawning, hurry-up mode, and victory and game-over screens. Menus, a pause screen, local profiles, a leaderboard, YM music, audio settings and a level editor are included.
 
 ## Run and build
 
@@ -19,9 +19,30 @@ Ebitengine supports macOS, Windows, Linux and WebAssembly. Desktop builds use pu
 CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o dist/bubblebobble.exe .
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o dist/bubblebobble-linux .
 make web
+make android
 ```
 
 Serve `dist/web` with a local HTTP server to play the browser build; opening the HTML directly from disk will not load WebAssembly. For example: `python3 -m http.server 8080 --directory dist/web`.
+
+## Android and Bluetooth
+
+`make android` builds and verifies a debug-signed ARM64 APK at `dist/android/bubblebobble-android-arm64.apk`. No USB connection is needed and the build does not run ADB. It uses Java 17, Android SDK 36, Build Tools 36.0.0, NDK 28.2.13676358, Gradle 8.11.1 and AGP 8.10.1. Ebitengine and `ebitenmobile` are both pinned to 2.10.2. Set `ANDROID_HOME` and `JAVA_HOME` when the tools are outside their usual macOS locations.
+
+For installation later, connect exactly one authorized phone and run `./scripts/run-android.sh`. See [Android details and device checks](docs/android.md).
+
+On the phone, use the left pad for movement, its upper sector to jump, and the **BUBBLE** button to shoot. Two fingers can hold direction/jump and fire simultaneously. **II** pauses. The arena retains its proportions, with controls beside it in landscape and below it on narrow displays. Menus, profile creation and the level editor accept touch. Preview the controls on a computer with `go run . -touch`.
+
+For cooperation, open **Bluetooth Co-op** on both phones. One player selects **Host a Game** and allows discoverability; the other selects **Join a Game** and chooses that phone. Android requests nearby-device permissions only when starting Bluetooth. Paired phones and nearby discoverable phones appear in the chooser. No internet connection or remote server is involved.
+
+The host plays the green dragon and the guest plays the blue dragon. Each has three lives and independent power-ups, with a shared score and bonus counters. Both players can pop bubbles and collect items. The surviving player continues if the other runs out of lives; a team extra life revives an eliminated partner. The campaign ends when both players are eliminated. Either player can pause/resume, and the host can restart. A disconnection ends the network session and returns to the Bluetooth menu; reconnection starts a new campaign.
+
+The host alone advances the simulation at 60 ticks per second. Guests send inputs and interpolate positions between compressed authoritative snapshots, normally 20 per second. Stale input is released after 250 ms. Bounded queues, version checks, connection deadlines and session identifiers handle slow links, cancellation and late Android callbacks. The protocol and two-player simulation are tested without radios; physical pairing, latency and suspend/resume still require two Android devices.
+
+## YM music
+
+Five supplied YM files are embedded and synthesized with `ym-player` revision `3f73bdca82e5`, using its `stsound` package. The synthesizer and Ebitengine audio context both run at **48,000 Hz**. A reused 4096-sample mono buffer feeds 16-bit stereo PCM without allocation in the reader. WAV effects are resampled to the same rate. Android opens the audio device from the first update after its view is ready.
+
+The main theme uses track 1, the menus use track 2, hurry-up uses track 3, game over uses track 4, and victory uses track 5. The embedded song metadata is retained. Music and effects have independent volume controls.
 
 ## Controls
 
@@ -89,13 +110,18 @@ go run . -mute -data-dir /tmp/bubblebobble-check \
   -screenshot /tmp/bubblebobble.png
 ```
 
-The smoke runner opens a real window, drives a short sequence of inputs and exits. It can capture `menu`, `game`, `pause`, `win`, `gameover`, `editor`, `profiles`, `settings`, `scores`, `help` or `credits`. It does not record campaign results. Graphical checks require a display session; simulation and save tests run without a window.
+The smoke runner opens a real window, drives a short sequence of inputs and exits. It can capture `menu`, `game`, `coop`, `pause`, `win`, `gameover`, `editor`, `profiles`, `new-profile`, `settings`, `scores`, `help`, `bluetooth` or `credits`. It does not record campaign results. Graphical checks require a display session; simulation, protocol, YM and save tests run without a window.
 
 - `internal/game`: deterministic simulation, collision handling, campaign loading and bonus rules; no dependency on Ebitengine.
 - `internal/save`: validated profiles, preferences and custom levels, with desktop and browser storage.
 - `resources`: embedded assets and editable campaign JSON.
-- Root package: Ebitengine rendering, input, sound, menus and editor.
+- `internal/app`: shared Ebitengine rendering, input, sound, menus, virtual controls and editor.
+- `internal/ym`: reusable 48 kHz YM reader, shared by desktop, web and Android.
+- `internal/netplay`: authoritative cooperative protocol over a reliable byte stream.
+- `internal/platform`: synchronized Android callbacks, separate from the game thread.
+- `mobile` and `android`: Ebitengine binding, native lifecycle, permissions and Bluetooth transport.
+- Root package: desktop/browser entry point, including `go run .`.
 
 ## Credits
 
-Original game, characters, artwork and arcade audio: Taito and their respective owners. Go adaptation: MALAKH SOFTWARE, 2026. Software is distributed under the included MIT [license](LICENSE); artwork and audio ownership is separate. This is an unofficial fan remake.
+Original game, characters, artwork and arcade effects: Taito and their respective owners. The supplied YM collection credits Tim & Mike Follin, with conversion credits retained in the files; the fifth tune is the bonus-room theme with an unidentified author in its metadata. Go adaptation: MALAKH SOFTWARE, 2026. Software is distributed under the included MIT [license](LICENSE); artwork and audio ownership is separate. This is an unofficial fan remake.

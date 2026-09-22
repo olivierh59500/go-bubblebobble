@@ -28,6 +28,9 @@ type Body struct {
 }
 
 type Player struct {
+	Lives              int
+	JumpBuffer, Coyote int
+	LastJump           bool
 	Body
 	Dir                               int
 	Invincible, Dead, Shoot, Cooldown int
@@ -94,8 +97,8 @@ type Game struct {
 	Paused                              bool
 	Tick, LevelTicks, Countdown, Freeze int
 	Hurry                               bool
-	Score, Lives                        int
-	Player                              Player
+	Score                               int
+	Players                             []Player
 	Enemies                             []Enemy
 	Bubbles                             []Bubble
 	Projectiles                         []Projectile
@@ -105,12 +108,15 @@ type Game struct {
 	Sounds                              []string
 	Counters                            Counters
 	spawnedSpecial, nextID, extraLifeAt int
-	jumpBuffer, coyote                  int
-	lastJump                            bool
 	rng                                 *rand.Rand
 }
 
-func New(levels []Level, seed uint64) (*Game, error) {
+func New(levels []Level, seed uint64) (*Game, error) { return NewPlayers(levels, seed, 1) }
+
+func NewPlayers(levels []Level, seed uint64, count int) (*Game, error) {
+	if count < 1 || count > 2 {
+		return nil, fmt.Errorf("expected one or two players")
+	}
 	if len(levels) == 0 {
 		return nil, fmt.Errorf("no levels supplied")
 	}
@@ -119,7 +125,10 @@ func New(levels []Level, seed uint64) (*Game, error) {
 			return nil, err
 		}
 	}
-	g := &Game{Campaign: levels, Lives: 3, extraLifeAt: 30000, rng: rand.New(rand.NewPCG(seed, seed^0xa0761d6478bd642f))}
+	g := &Game{Campaign: levels, Players: make([]Player, count), extraLifeAt: 30000, rng: rand.New(rand.NewPCG(seed, seed^0xa0761d6478bd642f))}
+	for i := range g.Players {
+		g.Players[i].Lives = 3
+	}
 	g.loadLevel(0)
 	return g, nil
 }
@@ -145,18 +154,36 @@ func (g *Game) loadLevel(index int) {
 		}
 		g.Enemies = append(g.Enemies, Enemy{Body: Body{X: x, Y: y}, ID: g.nextID, Kind: spawn.Kind, Dir: dir, Vertical: 1, Cooldown: 180, Phase: g.rng.Float64() * 2 * math.Pi})
 	}
-	g.respawn()
-	g.Player.Invincible = 0
+	for i := range g.Players {
+		g.respawn(i)
+		g.Players[i].Invincible = 0
+	}
 	g.State, g.Countdown = Ready, TPS
 }
 
-func (g *Game) respawn() {
-	x, y := g.spawnPosition(g.Level.Player)
-	g.Player = Player{Body: Body{X: x, Y: y}, Dir: 1, Invincible: 210}
-	g.jumpBuffer, g.coyote = 0, 0
+func (g *Game) respawn(index int) {
+	cell := g.Level.Player
+	if index == 1 {
+		cell.Col = Columns - 4 - cell.Col
+	}
+	x, y := g.spawnPosition(cell)
+	lives := g.Players[index].Lives
+	g.Players[index] = Player{Body: Body{X: x, Y: y}, Lives: lives, Dir: 1 - index*2, Invincible: 210}
 }
 
-func (g *Game) Step(in Input) {
+func (p Player) Alive() bool { return p.Lives > 0 && p.Dead == 0 }
+func (g *Game) anyoneAlive() bool {
+	for _, p := range g.Players {
+		if p.Alive() {
+			return true
+		}
+	}
+	return false
+}
+
+func (g *Game) Step(in Input) { g.StepPlayers([]Input{in}) }
+
+func (g *Game) StepPlayers(inputs []Input) {
 	g.Sounds = g.Sounds[:0]
 	if g.Paused || g.State == GameOver || g.State == Won {
 		return
@@ -169,19 +196,33 @@ func (g *Game) Step(in Input) {
 		}
 		return
 	}
-	if g.Player.Dead > 0 {
-		g.Player.Dead--
-		if g.Player.Dead == 0 {
-			if g.Lives == 0 {
-				g.State = GameOver
-				return
+	for i := range g.Players {
+		p := &g.Players[i]
+		if p.Dead > 0 {
+			p.Dead--
+			if p.Dead == 0 && p.Lives > 0 {
+				g.respawn(i)
+				g.Projectiles = nil
 			}
-			g.respawn()
-			g.Projectiles = nil
+		} else if p.Lives > 0 {
+			in := Input{}
+			if i < len(inputs) {
+				in = inputs[i]
+			}
+			g.updatePlayer(i, in)
 		}
-	} else {
-		g.updatePlayer(in)
 	}
+	finished := true
+	for _, p := range g.Players {
+		if p.Lives > 0 || p.Dead > 0 {
+			finished = false
+		}
+	}
+	if finished {
+		g.State = GameOver
+		return
+	}
+
 	if g.State == Playing {
 		if g.Freeze > 0 {
 			g.Freeze--
@@ -198,7 +239,7 @@ func (g *Game) Step(in Input) {
 		}
 		g.spawnSpecial()
 	}
-	g.updateBubbles(in)
+	g.updateBubbles(inputs)
 	g.updateEffects()
 	if g.updateItems() {
 		return
@@ -207,8 +248,10 @@ func (g *Game) Step(in Input) {
 	g.updateParticles()
 	if g.State == Playing {
 		g.checkPowerSpawns()
-		g.checkPlayerHit()
-		if g.remainingEnemies() == 0 && g.Player.Dead == 0 {
+		for i := range g.Players {
+			g.checkPlayerHit(i)
+		}
+		if g.remainingEnemies() == 0 && g.anyoneAlive() {
 			g.State, g.Countdown = Clearing, 7*TPS
 			g.Projectiles = nil
 		}
@@ -220,8 +263,8 @@ func (g *Game) Step(in Input) {
 	}
 }
 
-func (g *Game) updatePlayer(in Input) {
-	p := &g.Player
+func (g *Game) updatePlayer(index int, in Input) {
+	p := &g.Players[index]
 	if p.Invincible > 0 {
 		p.Invincible--
 	}
@@ -231,21 +274,21 @@ func (g *Game) updatePlayer(in Input) {
 	if p.Cooldown > 0 {
 		p.Cooldown--
 	}
-	if in.Jump && !g.lastJump {
-		g.jumpBuffer = 8
+	if in.Jump && !p.LastJump {
+		p.JumpBuffer = 8
 	}
-	g.lastJump = in.Jump
-	if g.jumpBuffer > 0 {
-		g.jumpBuffer--
+	p.LastJump = in.Jump
+	if p.JumpBuffer > 0 {
+		p.JumpBuffer--
 	}
 	if p.Ground {
-		g.coyote = 6
-	} else if g.coyote > 0 {
-		g.coyote--
+		p.Coyote = 6
+	} else if p.Coyote > 0 {
+		p.Coyote--
 	}
-	if g.jumpBuffer > 0 && g.coyote > 0 {
+	if p.JumpBuffer > 0 && p.Coyote > 0 {
 		p.VY, p.Ground = -11.5, false
-		g.coyote, g.jumpBuffer = 0, 0
+		p.Coyote, p.JumpBuffer = 0, 0
 		g.Counters.Jumps++
 		if p.Power.Amethyst {
 			g.addScore(500, p.X, p.Y)
@@ -273,7 +316,7 @@ func (g *Game) updatePlayer(in Input) {
 		}
 	}
 	if in.Fire && p.Cooldown == 0 {
-		g.shootBubble()
+		g.shootBubble(index)
 		p.Cooldown = 18
 		if p.Power.Yellow {
 			p.Cooldown = 5
@@ -282,14 +325,14 @@ func (g *Game) updatePlayer(in Input) {
 	}
 }
 
-func (g *Game) checkPlayerHit() {
-	p := &g.Player
-	if p.Invincible > 0 || p.Dead > 0 {
+func (g *Game) checkPlayerHit(index int) {
+	p := &g.Players[index]
+	if p.Invincible > 0 || !p.Alive() {
 		return
 	}
 	for _, e := range g.Enemies {
 		if e.State == Active && intersects(p.X+5, p.Y+5, 34, 36, e.X+4, e.Y+4, 36, 36) {
-			g.hurtPlayer()
+			g.hurtPlayer(index)
 			return
 		}
 	}
@@ -297,19 +340,20 @@ func (g *Game) checkPlayerHit() {
 		b := &g.Projectiles[i]
 		if !b.Removed && intersects(p.X+5, p.Y+5, 34, 36, b.X, b.Y, 16, 20) {
 			b.Removed = true
-			g.hurtPlayer()
+			g.hurtPlayer(index)
 			return
 		}
 	}
 }
 
-func (g *Game) hurtPlayer() {
-	if g.Player.Dead > 0 || g.Player.Invincible > 0 {
+func (g *Game) hurtPlayer(index int) {
+	p := &g.Players[index]
+	if !p.Alive() || p.Invincible > 0 {
 		return
 	}
-	g.Lives--
-	g.Player.Dead = 90
-	g.Player.Power = Powers{}
+	p.Lives--
+	p.Dead = 90
+	p.Power = Powers{}
 	g.Sounds = append(g.Sounds, "death")
 }
 
@@ -339,7 +383,7 @@ func (g *Game) defeat(e *Enemy, multiplier int) {
 		return
 	}
 	e.State, e.DeadTicks = Defeated, 50
-	e.VX, e.VY = float64(g.Player.Dir)*4, -8
+	e.VX, e.VY = float64(direction(e.X-Width/2))*4, -8
 	g.addScore(100*multiplier, e.X, e.Y)
 }
 
@@ -349,9 +393,15 @@ func (g *Game) addScore(points int, x, y float64) {
 		g.Particles = append(g.Particles, Particle{Body: Body{X: x, Y: y}, Text: fmt.Sprint(points), Life: 45})
 	}
 	for g.Score >= g.extraLifeAt {
-		g.Lives++
+		for i := range g.Players {
+			p := &g.Players[i]
+			p.Lives++
+			if p.Lives == 1 && p.Dead == 0 {
+				g.respawn(i)
+			}
+		}
 		g.extraLifeAt += 100000
-		g.Particles = append(g.Particles, Particle{Body: Body{X: g.Player.X, Y: g.Player.Y - 24}, Text: "1UP", Life: 90})
+		g.Particles = append(g.Particles, Particle{Body: Body{X: g.Players[0].X, Y: g.Players[0].Y - 24}, Text: "1UP", Life: 90})
 	}
 }
 

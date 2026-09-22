@@ -4,8 +4,8 @@ import "math"
 
 const bubbleSize = 40
 
-func (g *Game) shootBubble() {
-	p := &g.Player
+func (g *Game) shootBubble(player int) {
+	p := &g.Players[player]
 	speed, reach := 8.0, 200.0
 	if p.Power.Blue {
 		speed = 16
@@ -22,7 +22,7 @@ func (g *Game) shootBubble() {
 	g.Sounds = append(g.Sounds, "shoot")
 }
 
-func (g *Game) updateBubbles(in Input) {
+func (g *Game) updateBubbles(inputs []Input) {
 	for i := range g.Bubbles {
 		b := &g.Bubbles[i]
 		if b.Removed {
@@ -81,19 +81,25 @@ func (g *Game) updateBubbles(in Input) {
 			b.Removed = true
 			continue
 		}
-		p := &g.Player
-		if p.Dead > 0 || b.Age <= 20 {
-			continue
-		}
-		if in.Jump && p.VY >= 0 && p.Y+ActorSize >= b.Y && p.Y+ActorSize-p.VY <= b.Y+10 && p.X+ActorSize > b.X+4 && p.X < b.X+bubbleSize-4 {
-			p.Y = b.Y - ActorSize
-			p.VY = -10.5
-			p.Ground = false
-			g.Sounds = append(g.Sounds, "jump")
-			continue
-		}
-		if intersects(p.X+4, p.Y+4, 36, 36, b.X, b.Y, bubbleSize, bubbleSize) {
-			g.popBubble(i)
+		for player := range g.Players {
+			in := Input{}
+			if player < len(inputs) {
+				in = inputs[player]
+			}
+			p := &g.Players[player]
+			if !p.Alive() || b.Age <= 20 || b.Removed {
+				continue
+			}
+			if in.Jump && p.VY >= 0 && p.Y+ActorSize >= b.Y && p.Y+ActorSize-p.VY <= b.Y+10 && p.X+ActorSize > b.X+4 && p.X < b.X+bubbleSize-4 {
+				p.Y = b.Y - ActorSize
+				p.VY = -10.5
+				p.Ground = false
+				g.Sounds = append(g.Sounds, "jump")
+				continue
+			}
+			if intersects(p.X+4, p.Y+4, 36, 36, b.X, b.Y, bubbleSize, bubbleSize) {
+				g.popBubble(i, player)
+			}
 		}
 	}
 	kept := g.Bubbles[:0]
@@ -105,7 +111,7 @@ func (g *Game) updateBubbles(in Input) {
 	g.Bubbles = kept
 }
 
-func (g *Game) popBubble(index int) {
+func (g *Game) popBubble(index, player int) {
 	queue := []int{index}
 	combo := 0
 	for len(queue) > 0 {
@@ -125,7 +131,7 @@ func (g *Game) popBubble(index int) {
 			g.Items = append(g.Items, Item{Body: Body{X: x, Y: y}, Food: g.Level.Number, Stationary: true})
 		}
 		if b.Element != "" {
-			g.releaseElement(b)
+			g.releaseElement(b, player)
 		}
 		for j := range g.Bubbles {
 			other := &g.Bubbles[j]
@@ -164,9 +170,9 @@ func (g *Game) moveSpecialBubble(b *Bubble) {
 	}
 }
 
-func (g *Game) releaseElement(b *Bubble) {
+func (g *Game) releaseElement(b *Bubble, player int) {
 	g.nextID++
-	e := Effect{ID: g.nextID, Body: Body{X: b.X, Y: b.Y}, Element: b.Element, Dir: g.Player.Dir, Life: 300}
+	e := Effect{ID: g.nextID, Body: Body{X: b.X, Y: b.Y}, Element: b.Element, Dir: g.Players[player].Dir, Life: 300}
 	switch b.Element {
 	case Water:
 		g.Counters.Water++
@@ -279,11 +285,13 @@ func (g *Game) carryOnWater(effect *Effect) {
 			}
 		}
 	}
-	p := &g.Player
-	if p.Dead == 0 && p.VY >= 0 && intersects(p.X, p.Y, ActorSize, ActorSize, effect.X, effect.Y, 32, 32) {
-		x, y := effect.X, effect.Y-12
-		if !g.blocked(x, y, ActorSize) {
-			p.X, p.Y = x, y
+	for player := range g.Players {
+		p := &g.Players[player]
+		if p.Alive() && p.VY >= 0 && intersects(p.X, p.Y, ActorSize, ActorSize, effect.X, effect.Y, 32, 32) {
+			x, y := effect.X, effect.Y-12
+			if !g.blocked(x, y, ActorSize) {
+				p.X, p.Y = x, y
+			}
 		}
 	}
 }

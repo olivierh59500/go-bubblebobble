@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"path/filepath"
@@ -18,7 +18,7 @@ func TestEditorSaveReloadPlayAndUndo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a := &app{store: s, levels: levels, page: pageEditor, editor: editor{level: levels[0].Clone()}}
+	a := &App{store: s, levels: levels, page: pageEditor, editor: editor{level: levels[0].Clone()}}
 	a.editorAction("new")
 	if len(a.editor.level.Enemies) != 0 {
 		t.Fatal("new level kept template enemies")
@@ -64,7 +64,7 @@ func TestEndRunRecordedOnlyOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a := &app{store: s, levels: levels}
+	a := &App{store: s, levels: levels}
 	a.start(false)
 	a.match.Score = 1200
 	a.record(false)
@@ -73,7 +73,7 @@ func TestEndRunRecordedOnlyOnce(t *testing.T) {
 		t.Fatal("run recorded incorrectly")
 	}
 	a.activate("restart")
-	if s.Profile().Played != 1 || a.match.Score != 0 || a.match.Lives != 3 {
+	if s.Profile().Played != 1 || a.match.Score != 0 || a.match.Players[0].Lives != 3 {
 		t.Fatal("restart did not start a clean run")
 	}
 }
