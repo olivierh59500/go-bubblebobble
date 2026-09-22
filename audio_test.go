@@ -1,42 +1,49 @@
 package main
 
 import (
-	"os"
+	"bytes"
+	"io"
 	"testing"
 
-	"github.com/hajimehoshi/go-mp3"
+	"bubblebobble/resources"
+	"github.com/hajimehoshi/ebiten/v2/audio/vorbis"
 )
 
-func TestLoadAudioManagerLoadsConfiguredAssets(t *testing.T) {
-	audio, err := loadAudioManager()
+func TestAllAudioDecodesWithoutDevice(t *testing.T) {
+	a, err := newSoundSystem(true)
 	if err != nil {
-		t.Fatalf("load audio: %v", err)
+		t.Fatal(err)
 	}
-	if len(audio.sounds) != 8 {
-		t.Fatalf("expected 8 configured sounds, got %d", len(audio.sounds))
+	if a.context != nil {
+		t.Fatal("muted startup opened an audio device")
 	}
-	if len(audio.sounds["bubble-shoot-sound"].Bytes) == 0 {
-		t.Fatal("bubble shoot sound decoded to empty PCM data")
+	for name, data := range a.sounds {
+		if len(data) == 0 || len(data)%4 != 0 {
+			t.Errorf("invalid stereo PCM for %s", name)
+		}
 	}
-	if audio.music["main-theme"].Path == "" {
-		t.Fatal("main theme music was not registered")
-	}
-}
-
-func TestMainThemeMatchesAudioContextSampleRate(t *testing.T) {
-	file, err := os.Open("res/sounds/tim-follin-atari/02 Bubble Bobble - Ingame-Title__Loop.mp3")
-	if err != nil {
-		t.Fatalf("open main theme: %v", err)
-	}
-	defer file.Close()
-	decoder, err := mp3.NewDecoder(file)
-	if err != nil {
-		t.Fatalf("decode main theme: %v", err)
-	}
-	if decoder.SampleRate() != audioSampleRate {
-		t.Fatalf("main theme sample rate is %d, audio context is %d", decoder.SampleRate(), audioSampleRate)
-	}
-	if decoder.Length() <= 0 {
-		t.Fatal("main theme decoded length should be available for looping")
+	for _, name := range []string{"menu", "opening", "theme", "hurry"} {
+		data, err := resources.Files.ReadFile("audio/" + name + ".ogg")
+		if err != nil {
+			t.Fatal(err)
+		}
+		stream, err := vorbis.DecodeWithSampleRate(sampleRate, bytes.NewReader(data))
+		if err != nil {
+			t.Fatal(err)
+		}
+		n, err := io.Copy(io.Discard, stream)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n != stream.Length() || n == 0 || n%4 != 0 {
+			t.Errorf("%s has invalid decoded length %d, declared %d", name, n, stream.Length())
+		}
+		if _, err := stream.Seek(0, io.SeekStart); err != nil {
+			t.Fatal(err)
+		}
+		buf := make([]byte, 1024)
+		if _, err := io.ReadFull(stream, buf); err != nil {
+			t.Fatal(err)
+		}
 	}
 }

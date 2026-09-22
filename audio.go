@@ -1,158 +1,135 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
-	"os"
 
+	"bubblebobble/resources"
 	"github.com/hajimehoshi/ebiten/v2/audio"
+	"github.com/hajimehoshi/ebiten/v2/audio/vorbis"
 	"github.com/hajimehoshi/ebiten/v2/audio/wav"
-	"github.com/hajimehoshi/go-mp3"
 )
 
-type soundData struct {
-	Bytes  []byte
-	Volume float64
+const sampleRate = 44100
+
+type soundSystem struct {
+	context                  *audio.Context
+	sounds                   map[string][]byte
+	players                  []*audio.Player
+	music                    *audio.Player
+	track                    string
+	musicVolume, soundVolume float64
+	muted                    bool
 }
 
-type musicData struct {
-	Path   string
-	Volume float64
-}
-
-type audioManager struct {
-	ctx         *audio.Context
-	sounds      map[string]soundData
-	music       map[string]musicData
-	musicPlayer *audio.Player
-	openFiles   []*os.File
-	players     []*audio.Player
-}
-
-type audioConfig struct {
-	Sound []struct {
-		Name   string   `json:"name"`
-		Path   string   `json:"path"`
-		Volume *float64 `json:"volume"`
-	} `json:"sound"`
-	Music []struct {
-		Name   string   `json:"name"`
-		Path   string   `json:"path"`
-		Volume *float64 `json:"volume"`
-	} `json:"music"`
-}
-
-func loadAudioManager() (*audioManager, error) {
-	manager := &audioManager{
-		ctx:    audio.NewContext(audioSampleRate),
-		sounds: map[string]soundData{},
-		music:  map[string]musicData{},
+func newSoundSystem(muted bool) (*soundSystem, error) {
+	a := &soundSystem{sounds: map[string][]byte{}, muted: muted}
+	// A muted launch also works on machines without an audio device.
+	if !muted {
+		a.context = audio.NewContext(sampleRate)
 	}
-	var config audioConfig
-	if err := loadJSON("res/sounds/Audio.json", &config); err != nil {
-		return manager, err
-	}
-	var loadErrors []error
-	for _, sound := range config.Sound {
-		volume := 1.0
-		if sound.Volume != nil {
-			volume = *sound.Volume
-		}
-		file, err := os.Open(sound.Path)
+	for _, name := range []string{"shoot", "jump", "pop", "death", "food", "item", "fire", "water", "explosion", "laser"} {
+		b, err := resources.Files.ReadFile("audio/" + name + ".wav")
 		if err != nil {
-			loadErrors = append(loadErrors, fmt.Errorf("open sound %s: %w", sound.Name, err))
-			continue
+			return nil, err
 		}
-		stream, err := wav.DecodeWithSampleRate(audioSampleRate, file)
+		stream, err := wav.DecodeWithSampleRate(sampleRate, bytes.NewReader(b))
 		if err != nil {
-			_ = file.Close()
-			loadErrors = append(loadErrors, fmt.Errorf("decode sound %s: %w", sound.Name, err))
-			continue
+			return nil, fmt.Errorf("decode %s: %w", name, err)
 		}
-		bytes, err := io.ReadAll(stream)
-		_ = file.Close()
+		a.sounds[name], err = io.ReadAll(stream)
 		if err != nil {
-			loadErrors = append(loadErrors, fmt.Errorf("read sound %s: %w", sound.Name, err))
-			continue
+			return nil, err
 		}
-		manager.sounds[sound.Name] = soundData{Bytes: bytes, Volume: volume}
 	}
-	for _, music := range config.Music {
-		volume := 1.0
-		if music.Volume != nil {
-			volume = *music.Volume
-		}
-		manager.music[music.Name] = musicData{Path: music.Path, Volume: volume}
-	}
-	if len(loadErrors) > 0 {
-		return manager, fmt.Errorf("audio loaded with %d sound error(s): %w", len(loadErrors), loadErrors[0])
-	}
-	return manager, nil
+	return a, nil
 }
 
-func (a *audioManager) playSound(name string) {
-	if a == nil || a.ctx == nil {
-		return
+func (a *soundSystem) setVolumes(music, sound int) {
+	a.musicVolume = float64(music) / 100
+	a.soundVolume = float64(sound) / 100
+	if a.music != nil {
+		a.music.SetVolume(a.musicVolume)
 	}
-	sound, ok := a.sounds[name]
-	if !ok || len(sound.Bytes) == 0 {
-		return
-	}
-	player := a.ctx.NewPlayerFromBytes(sound.Bytes)
-	player.SetVolume(sound.Volume)
-	player.Play()
-	a.players = append(a.players, player)
 }
 
-func (a *audioManager) playMusic(name string) {
-	if a == nil || a.ctx == nil {
+func (a *soundSystem) play(name string) {
+	if a.muted || a.context == nil || a.soundVolume == 0 || len(a.players) >= 24 {
 		return
 	}
-	if a.musicPlayer != nil {
-		if !a.musicPlayer.IsPlaying() {
-			a.musicPlayer.Play()
-		}
+	b := a.sounds[name]
+	if len(b) == 0 {
 		return
 	}
-	music, ok := a.music[name]
-	if !ok {
-		return
-	}
-	file, err := os.Open(music.Path)
-	if err != nil {
-		return
-	}
-	decoder, err := mp3.NewDecoder(file)
-	if err != nil {
-		_ = file.Close()
-		return
-	}
-	if decoder.SampleRate() != audioSampleRate || decoder.Length() <= 0 {
-		_ = file.Close()
-		return
-	}
-	player, err := a.ctx.NewPlayer(audio.NewInfiniteLoop(decoder, decoder.Length()))
-	if err != nil {
-		_ = file.Close()
-		return
-	}
-	player.SetVolume(music.Volume)
-	player.Play()
-	a.musicPlayer = player
-	a.openFiles = append(a.openFiles, file)
+	p := a.context.NewPlayerFromBytes(b)
+	p.SetVolume(a.soundVolume)
+	p.Play()
+	a.players = append(a.players, p)
 }
 
-func (a *audioManager) update() {
-	if a == nil {
-		return
-	}
-	players := a.players[:0]
-	for _, player := range a.players {
-		if player.IsPlaying() {
-			players = append(players, player)
-			continue
+func (a *soundSystem) update(track string, paused bool) error {
+	kept := a.players[:0]
+	for _, p := range a.players {
+		if p.IsPlaying() {
+			kept = append(kept, p)
+		} else {
+			p.PauseAndStopReading()
 		}
-		_ = player.Close()
 	}
-	a.players = players
+	a.players = kept
+	if a.muted || a.context == nil {
+		if a.music != nil {
+			a.music.Pause()
+		}
+		return nil
+	}
+	if a.track != track {
+		if a.music != nil {
+			a.music.PauseAndStopReading()
+			a.music = nil
+		}
+		b, err := resources.Files.ReadFile("audio/" + track + ".ogg")
+		if err != nil {
+			return err
+		}
+		stream, err := vorbis.DecodeWithSampleRate(sampleRate, bytes.NewReader(b))
+		if err != nil {
+			return err
+		}
+		a.music, err = a.context.NewPlayer(audio.NewInfiniteLoop(stream, stream.Length()))
+		if err != nil {
+			return err
+		}
+		a.music.SetVolume(a.musicVolume)
+		a.track = track
+	}
+	if paused {
+		a.music.Pause()
+	} else if !a.music.IsPlaying() {
+		a.music.Play()
+	}
+	return nil
+}
+
+func (a *soundSystem) toggleMute() {
+	a.muted = !a.muted
+	if !a.muted && a.context == nil {
+		a.context = audio.NewContext(sampleRate)
+	}
+	if a.muted {
+		for _, p := range a.players {
+			p.PauseAndStopReading()
+		}
+		a.players = nil
+	}
+}
+
+func (a *soundSystem) close() {
+	if a.music != nil {
+		a.music.PauseAndStopReading()
+	}
+	for _, p := range a.players {
+		p.PauseAndStopReading()
+	}
 }

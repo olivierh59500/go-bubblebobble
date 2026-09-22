@@ -1,0 +1,431 @@
+{
+  "green/walk": [
+    "sprites/green/walk/0.png",
+    "sprites/green/walk/1.png",
+    "sprites/green/walk/2.png",
+    "sprites/green/walk/3.png",
+    "sprites/green/walk/4.png",
+    "sprites/green/walk/5.png",
+    "sprites/green/walk/6.png"
+  ],
+  "green/jump": [
+    "sprites/green/jump/0.png",
+    "sprites/green/jump/1.png",
+    "sprites/green/jump/2.png",
+    "sprites/green/jump/3.png"
+  ],
+  "green/shoot": [
+    "sprites/green/shoot/0.png",
+    "sprites/green/shoot/1.png",
+    "sprites/green/shoot/2.png",
+    "sprites/green/shoot/3.png"
+  ],
+  "green/dead": [
+    "sprites/green/dead/0.png",
+    "sprites/green/dead/1.png",
+    "sprites/green/dead/2.png",
+    "sprites/green/dead/3.png"
+  ],
+  "blue/walk": [
+    "sprites/blue/walk/0.png",
+    "sprites/blue/walk/1.png",
+    "sprites/blue/walk/2.png",
+    "sprites/blue/walk/3.png",
+    "sprites/blue/walk/4.png",
+    "sprites/blue/walk/5.png",
+    "sprites/blue/walk/6.png"
+  ],
+  "blue/jump": [
+    "sprites/blue/jump/0.png",
+    "sprites/blue/jump/1.png",
+    "sprites/blue/jump/2.png",
+    "sprites/blue/jump/3.png"
+  ],
+  "blue/shoot": [
+    "sprites/blue/shoot/0.png",
+    "sprites/blue/shoot/1.png",
+    "sprites/blue/shoot/2.png",
+    "sprites/blue/shoot/3.png"
+  ],
+  "blue/dead": [
+    "sprites/blue/dead/0.png",
+    "sprites/blue/dead/1.png",
+    "sprites/blue/dead/2.png",
+    "sprites/blue/dead/3.png"
+  ],
+  "zenchan/walk": [
+    "sprites/zenchan/walk/0.png",
+    "sprites/zenchan/walk/1.png",
+    "sprites/zenchan/walk/2.png",
+    "sprites/zenchan/walk/3.png"
+  ],
+  "zenchan/angry": [
+    "sprites/zenchan/angry/0.png",
+    "sprites/zenchan/angry/1.png",
+    "sprites/zenchan/angry/2.png",
+    "sprites/zenchan/angry/3.png"
+  ],
+  "zenchan/dead": [
+    "sprites/zenchan/dead/0.png",
+    "sprites/zenchan/dead/1.png",
+    "sprites/zenchan/dead/2.png",
+    "sprites/zenchan/dead/3.png"
+  ],
+  "zenchan/bubble": [
+    "sprites/zenchan/bubble/0.png",
+    "sprites/zenchan/bubble/1.png",
+    "sprites/zenchan/bubble/2.png"
+  ],
+  "zenchan/warning": [
+    "sprites/zenchan/warning/0.png",
+    "sprites/zenchan/warning/1.png",
+    "sprites/zenchan/warning/2.png"
+  ],
+  "zenchan/escape": [
+    "sprites/zenchan/escape/0.png",
+    "sprites/zenchan/escape/1.png",
+    "sprites/zenchan/escape/2.png"
+  ],
+  "monsta/walk": [
+    "sprites/monsta/walk/0.png",
+    "sprites/monsta/walk/1.png"
+  ],
+  "monsta/angry": [
+    "sprites/monsta/angry/0.png",
+    "sprites/monsta/angry/1.png"
+  ],
+  "monsta/dead": [
+    "sprites/monsta/dead/0.png",
+    "sprites/monsta/dead/1.png",
+    "sprites/monsta/dead/2.png",
+    "sprites/monsta/dead/3.png",
+    "sprites/monsta/dead/4.png"
+  ],
+  "monsta/bubble": [
+    "sprites/monsta/bubble/0.png",
+    "sprites/monsta/bubble/1.png",
+    "sprites/monsta/bubble/2.png"
+  ],
+  "monsta/warning": [
+    "sprites/monsta/warning/0.png",
+    "sprites/monsta/warning/1.png",
+    "sprites/monsta/warning/2.png"
+  ],
+  "monsta/escape": [
+    "sprites/monsta/escape/0.png",
+    "sprites/monsta/escape/1.png",
+    "sprites/monsta/escape/2.png"
+  ],
+  "mighta/walk": [
+    "sprites/mighta/walk/0.png",
+    "sprites/mighta/walk/1.png",
+    "sprites/mighta/walk/2.png",
+    "sprites/mighta/walk/3.png",
+    "sprites/mighta/walk/4.png"
+  ],
+  "mighta/angry": [
+    "sprites/mighta/angry/0.png",
+    "sprites/mighta/angry/1.png",
+    "sprites/mighta/angry/2.png",
+    "sprites/mighta/angry/3.png",
+    "sprites/mighta/angry/4.png"
+  ],
+  "mighta/dead": [
+    "sprites/mighta/dead/0.png",
+    "sprites/mighta/dead/1.png",
+    "sprites/mighta/dead/2.png",
+    "sprites/mighta/dead/3.png"
+  ],
+  "mighta/bubble": [
+    "sprites/mighta/bubble/0.png",
+    "sprites/mighta/bubble/1.png",
+    "sprites/mighta/bubble/2.png"
+  ],
+  "mighta/warning": [
+    "sprites/mighta/warning/0.png",
+    "sprites/mighta/warning/1.png",
+    "sprites/mighta/warning/2.png"
+  ],
+  "mighta/escape": [
+    "sprites/mighta/escape/0.png",
+    "sprites/mighta/escape/1.png",
+    "sprites/mighta/escape/2.png"
+  ],
+  "pulpul/walk": [
+    "sprites/pulpul/walk/0.png",
+    "sprites/pulpul/walk/1.png",
+    "sprites/pulpul/walk/2.png",
+    "sprites/pulpul/walk/3.png"
+  ],
+  "pulpul/angry": [
+    "sprites/pulpul/angry/0.png",
+    "sprites/pulpul/angry/1.png",
+    "sprites/pulpul/angry/2.png",
+    "sprites/pulpul/angry/3.png"
+  ],
+  "pulpul/dead": [
+    "sprites/pulpul/dead/0.png",
+    "sprites/pulpul/dead/1.png",
+    "sprites/pulpul/dead/2.png",
+    "sprites/pulpul/dead/3.png"
+  ],
+  "pulpul/bubble": [
+    "sprites/pulpul/bubble/0.png",
+    "sprites/pulpul/bubble/1.png",
+    "sprites/pulpul/bubble/2.png"
+  ],
+  "pulpul/warning": [
+    "sprites/pulpul/warning/0.png",
+    "sprites/pulpul/warning/1.png",
+    "sprites/pulpul/warning/2.png"
+  ],
+  "pulpul/escape": [
+    "sprites/pulpul/escape/0.png",
+    "sprites/pulpul/escape/1.png",
+    "sprites/pulpul/escape/2.png"
+  ],
+  "banebou/walk": [
+    "sprites/banebou/walk/0.png",
+    "sprites/banebou/walk/1.png",
+    "sprites/banebou/walk/2.png"
+  ],
+  "banebou/angry": [
+    "sprites/banebou/angry/0.png",
+    "sprites/banebou/angry/1.png",
+    "sprites/banebou/angry/2.png"
+  ],
+  "banebou/dead": [
+    "sprites/banebou/dead/0.png",
+    "sprites/banebou/dead/1.png",
+    "sprites/banebou/dead/2.png",
+    "sprites/banebou/dead/3.png"
+  ],
+  "banebou/bubble": [
+    "sprites/banebou/bubble/0.png",
+    "sprites/banebou/bubble/1.png",
+    "sprites/banebou/bubble/2.png"
+  ],
+  "banebou/warning": [
+    "sprites/banebou/warning/0.png",
+    "sprites/banebou/warning/1.png",
+    "sprites/banebou/warning/2.png"
+  ],
+  "banebou/escape": [
+    "sprites/banebou/escape/0.png",
+    "sprites/banebou/escape/1.png",
+    "sprites/banebou/escape/2.png"
+  ],
+  "invader/walk": [
+    "sprites/invader/walk/0.png",
+    "sprites/invader/walk/1.png"
+  ],
+  "invader/angry": [
+    "sprites/invader/angry/0.png",
+    "sprites/invader/angry/1.png"
+  ],
+  "invader/dead": [
+    "sprites/invader/dead/0.png",
+    "sprites/invader/dead/1.png",
+    "sprites/invader/dead/2.png",
+    "sprites/invader/dead/3.png"
+  ],
+  "invader/bubble": [
+    "sprites/invader/bubble/0.png",
+    "sprites/invader/bubble/1.png",
+    "sprites/invader/bubble/2.png"
+  ],
+  "invader/warning": [
+    "sprites/invader/warning/0.png",
+    "sprites/invader/warning/1.png",
+    "sprites/invader/warning/2.png"
+  ],
+  "invader/escape": [
+    "sprites/invader/escape/0.png",
+    "sprites/invader/escape/1.png",
+    "sprites/invader/escape/2.png"
+  ],
+  "mighta/shoot": [
+    "sprites/mighta/shoot/0.png",
+    "sprites/mighta/shoot/1.png",
+    "sprites/mighta/shoot/2.png",
+    "sprites/mighta/shoot/3.png",
+    "sprites/mighta/shoot/4.png"
+  ],
+  "mighta/shoot-angry": [
+    "sprites/mighta/shoot-angry/0.png",
+    "sprites/mighta/shoot-angry/1.png",
+    "sprites/mighta/shoot-angry/2.png",
+    "sprites/mighta/shoot-angry/3.png",
+    "sprites/mighta/shoot-angry/4.png"
+  ],
+  "bubble": [
+    "sprites/bubble/0.png",
+    "sprites/bubble/1.png",
+    "sprites/bubble/2.png",
+    "sprites/bubble/3.png"
+  ],
+  "pop": [
+    "sprites/pop/0.png"
+  ],
+  "bubble-warning": [
+    "sprites/bubble-warning/0.png",
+    "sprites/bubble-warning/1.png"
+  ],
+  "water-bubble": [
+    "sprites/water-bubble/0.png",
+    "sprites/water-bubble/1.png",
+    "sprites/water-bubble/2.png"
+  ],
+  "thunder-bubble": [
+    "sprites/thunder-bubble/0.png",
+    "sprites/thunder-bubble/1.png",
+    "sprites/thunder-bubble/2.png"
+  ],
+  "fire-bubble": [
+    "sprites/fire-bubble/0.png",
+    "sprites/fire-bubble/1.png",
+    "sprites/fire-bubble/2.png"
+  ],
+  "water": [
+    "sprites/water/0.png"
+  ],
+  "thunder": [
+    "sprites/thunder/0.png",
+    "sprites/thunder/1.png",
+    "sprites/thunder/2.png"
+  ],
+  "fire": [
+    "sprites/fire/0.png",
+    "sprites/fire/1.png",
+    "sprites/fire/2.png"
+  ],
+  "flame": [
+    "sprites/flame/0.png",
+    "sprites/flame/1.png",
+    "sprites/flame/2.png",
+    "sprites/flame/3.png",
+    "sprites/flame/4.png",
+    "sprites/flame/5.png"
+  ],
+  "boulder": [
+    "sprites/boulder/0.png",
+    "sprites/boulder/1.png",
+    "sprites/boulder/2.png",
+    "sprites/boulder/3.png"
+  ],
+  "laser": [
+    "sprites/laser/0.png",
+    "sprites/laser/1.png"
+  ],
+  "food/1": [
+    "sprites/food/1/0.png"
+  ],
+  "food/2": [
+    "sprites/food/2/0.png"
+  ],
+  "food/3": [
+    "sprites/food/3/0.png"
+  ],
+  "food/4": [
+    "sprites/food/4/0.png"
+  ],
+  "food/5": [
+    "sprites/food/5/0.png"
+  ],
+  "food/6": [
+    "sprites/food/6/0.png"
+  ],
+  "food/7": [
+    "sprites/food/7/0.png"
+  ],
+  "food/8": [
+    "sprites/food/8/0.png"
+  ],
+  "food/9": [
+    "sprites/food/9/0.png"
+  ],
+  "food/10": [
+    "sprites/food/10/0.png"
+  ],
+  "food/11": [
+    "sprites/food/11/0.png"
+  ],
+  "food/12": [
+    "sprites/food/12/0.png"
+  ],
+  "food/13": [
+    "sprites/food/13/0.png"
+  ],
+  "food/14": [
+    "sprites/food/14/0.png"
+  ],
+  "food/15": [
+    "sprites/food/15/0.png"
+  ],
+  "food/16": [
+    "sprites/food/16/0.png"
+  ],
+  "food/17": [
+    "sprites/food/17/0.png"
+  ],
+  "food/18": [
+    "sprites/food/18/0.png"
+  ],
+  "food/19": [
+    "sprites/food/19/0.png"
+  ],
+  "food/20": [
+    "sprites/food/20/0.png"
+  ],
+  "food/21": [
+    "sprites/food/21/0.png"
+  ],
+  "food/22": [
+    "sprites/food/22/0.png"
+  ],
+  "food/23": [
+    "sprites/food/23/0.png"
+  ],
+  "food/24": [
+    "sprites/food/24/0.png"
+  ],
+  "food/25": [
+    "sprites/food/25/0.png"
+  ],
+  "pink_candy": [
+    "sprites/items/pink_candy.png"
+  ],
+  "blue_candy": [
+    "sprites/items/blue_candy.png"
+  ],
+  "yellow_candy": [
+    "sprites/items/yellow_candy.png"
+  ],
+  "shoes": [
+    "sprites/items/shoes.png"
+  ],
+  "orange_parasol": [
+    "sprites/items/orange_parasol.png"
+  ],
+  "red_parasol": [
+    "sprites/items/red_parasol.png"
+  ],
+  "purple_parasol": [
+    "sprites/items/purple_parasol.png"
+  ],
+  "crystal_ring": [
+    "sprites/items/crystal_ring.png"
+  ],
+  "amethyst_ring": [
+    "sprites/items/amethyst_ring.png"
+  ],
+  "ruby_ring": [
+    "sprites/items/ruby_ring.png"
+  ],
+  "dynamite": [
+    "sprites/items/dynamite.png"
+  ],
+  "clock": [
+    "sprites/items/clock.png"
+  ]
+}

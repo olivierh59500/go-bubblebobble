@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bubble Bobble</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #080c1b; color: #ebf5ff; font: 16px monospace; }
+    #loader { position: fixed; inset: 0; display: grid; place-content: center; gap: 24px; text-align: center; }
+    h1 { color: #70f089; }
+    button { padding: 16px 24px; background: #70f089; color: #080c1b; border: 0; cursor: pointer; font: inherit; }
+    #status { max-width: 480px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <div id="loader">
+    <h1>Bubble Bobble</h1>
+    <p id="status">25 rounds. One bubbly adventure.</p>
+    <button id="start">Play</button>
+  </div>
+  <script src="wasm_exec.js"></script>
+  <script>
+    const start = document.getElementById('start');
+    const loader = document.getElementById('loader');
+    const status = document.getElementById('status');
+    start.addEventListener('click', async () => {
+      start.disabled = true;
+      status.textContent = 'Loading the game...';
+      try {
+        const response = await fetch('game.wasm');
+        if (!response.ok) throw new Error('The game could not be downloaded.');
+        const go = new Go();
+        const { instance } = await WebAssembly.instantiate(await response.arrayBuffer(), go.importObject);
+        loader.style.display = 'none';
+        await go.run(instance);
+        loader.style.display = 'grid';
+        status.textContent = 'Game closed. Reload this page to play again.';
+      } catch (error) {
+        loader.style.display = 'grid';
+        status.textContent = error.message;
+        start.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
