@@ -1,28 +1,60 @@
-# Bubble Bobble
+# Bubble Bobble in Go
 
-An arcade game in Go, powered by Ebitengine 2.10.2, with solo play and cooperative play between two Android phones over Bluetooth. Clear 25 rounds by trapping enemies in bubbles and popping them. Choose the green or blue dragon in your solo profile settings.
+An unofficial remake of Taito's arcade game, written in Go with Ebitengine 2.10.2. Trap enemies in bubbles, pop them, collect fruit and clear a 25-round campaign. Play solo as the green or blue dragon, or team up across two Android phones over Bluetooth.
 
-The campaign includes all 25 tile maps and 140 enemy placements, six enemy types (Zen-Chan, Monsta, Mighta, Pulpul, Banebou and Invader), boulders and lasers, water/lightning/fire bubbles, twelve power-ups, fruit, chain bonuses, three lives, respawning, hurry-up mode, and victory and game-over screens. Menus, a pause screen, local profiles, a leaderboard, YM music, audio settings and a level editor are included.
+[Run the game](#run-and-build) · [Controls](#controls) · [Android co-op](#android-and-bluetooth) · [Level editor](#level-editor)
+
+## Gameplay preview
+
+[![Animated gameplay: rounds 02, 04 and 07](docs/media/preview.gif)](https://github.com/olivierh59500/go-bubblebobble/raw/refs/heads/main/docs/media/preview.mp4)
+
+**[Watch the 28-second gameplay video with music and effects (MP4)](https://github.com/olivierh59500/go-bubblebobble/raw/refs/heads/main/docs/media/preview.mp4)** · [Download the MP4](docs/media/preview.mp4) · [View the silent GIF](docs/media/preview.gif)
+
+The video follows solo play through three different arenas. The six-second GIF above is a silent, looping excerpt. Both are taken from a recorded game session.
+
+| Main menu | Round 02 | Round 07 |
+| --- | --- | --- |
+| [![Main menu with the green and blue dragons](docs/media/screenshot-1.png)](docs/media/screenshot-1.png) | [![Round 02: trap enemies in bubbles on red platforms](docs/media/screenshot-2.png)](docs/media/screenshot-2.png) | [![Round 07: enemies and bubbles among blue platforms](docs/media/screenshot-3.png)](docs/media/screenshot-3.png) |
+
+Click a screenshot to open its full-size 1280 × 1200 capture.
+
+## Features
+
+- **25 rounds and 140 enemy placements**, with six enemy types: Zen-Chan, Monsta, Mighta, Pulpul, Banebou and Invader. Watch out for boulders, lasers and hurry-up mode.
+- **Arcade bonuses:** water, lightning and fire bubbles; twelve power-ups; fruit; chain bonuses; extra lives and respawning.
+- **Solo play and Android Bluetooth co-op**, with keyboard, standard gamepad and touch controls.
+- **Local profiles and a leaderboard**, a pause menu, independent music/effect volumes, fullscreen and five synthesized YM music tracks.
+- **A built-in level editor** with campaign templates, undo, custom-level saving and instant play testing.
+- **Embedded resources** for desktop, browser and Android builds: artwork, fonts, levels, effects and music travel with the game.
 
 ## Run and build
 
-Requires Go 1.26 or later. Artwork, fonts, levels, effects and music are embedded: the executable works from any directory without external resource files.
+Requires **Go 1.26 or later**. From a fresh checkout:
 
 ```sh
+git clone https://github.com/olivierh59500/go-bubblebobble.git
+cd go-bubblebobble
 go run .
-go build -o bubblebobble .
 ```
 
-Ebitengine supports macOS, Windows, Linux and WebAssembly. Desktop builds use pure Go; Linux still needs runtime graphics, window-system and audio libraries.
+Build a desktop executable with `go build -o bubblebobble .`, or use `make build`. Its embedded resources let it run from any directory. Start with `go run . -mute` to avoid opening an audio device, or `go run . -touch` to preview the phone controls.
+
+Ebitengine supports macOS, Windows, Linux and WebAssembly. Desktop builds use pure Go; Linux still needs runtime graphics, window-system and audio libraries. See the [Ebitengine installation guide](https://ebitengine.org/en/documents/install.html) for platform setup.
 
 ```sh
+mkdir -p dist
 CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o dist/bubblebobble.exe .
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o dist/bubblebobble-linux .
-make web
-make android
 ```
 
-Serve `dist/web` with a local HTTP server to play the browser build; opening the HTML directly from disk will not load WebAssembly. For example: `python3 -m http.server 8080 --directory dist/web`.
+Build and serve the browser version:
+
+```sh
+make web
+python3 -m http.server 8080 --directory dist/web
+```
+
+Open <http://localhost:8080>. WebAssembly needs an HTTP server; opening `index.html` directly from disk will not load the game. Android builds use `make android`; see the tool requirements below.
 
 ## Android and Bluetooth
 
@@ -40,7 +72,7 @@ The host alone advances the simulation at 60 ticks per second. Guests send input
 
 ## YM music
 
-Five supplied YM files are embedded and synthesized with `ym-player` revision `3f73bdca82e5`, using its `stsound` package. The synthesizer and Ebitengine audio context both run at **48,000 Hz**. A reused 4096-sample mono buffer feeds 16-bit stereo PCM without allocation in the reader. WAV effects are resampled to the same rate. Android opens the audio device from the first update after its view is ready.
+Five supplied YM files are embedded and synthesized with [`ym-player`](https://github.com/olivierh59500/ym-player), using its `stsound` package at revision `3f73bdca82e5`. Music and WAV effects play at **48,000 Hz**. Android opens the audio device after its view is ready.
 
 The main theme uses track 1, the menus use track 2, hurry-up uses track 3, game over uses track 4, and victory uses track 5. The embedded song metadata is retained. Music and effects have independent volume controls.
 
@@ -58,7 +90,7 @@ The main theme uses track 1, the menus use track 2, hurry-up uses track 3, game 
 | Fullscreen | F11 | Settings menu |
 | Mute | M | Settings menu |
 
-Menus also support the mouse. Touch an established bubble to pop it; hold jump while landing on one to bounce. Adjacent bubbles pop in a chain. Esc pauses every gameplay timer. Losing window focus pauses a desktop game. Restart and End Run count an unfinished campaign as a loss.
+Menus also support the mouse. Make the dragon touch an established bubble to pop it; hold jump while landing on one to bounce. Adjacent bubbles pop in a chain. Esc pauses every gameplay timer. Losing window focus pauses a desktop game. Restart and End Run count an unfinished campaign as a loss.
 
 ## Bonuses and progression
 
